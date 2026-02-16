@@ -1,0 +1,11 @@
+import { Injectable, ExecutionContext } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+
+@Injectable()
+export class JwtAuthGuard extends AuthGuard('jwt') {
+	// allow guard to attach full request user
+	handleRequest(err: any, user: any, info: any, context: ExecutionContext) {
+		if (err || !user) return null;
+		return user;
+	}
+}

@@ -1,0 +1,163 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  ADMIN
+  AGENT
+  CLIENT
+}
+
+enum Format {
+  SACHET
+  BOUTEILLE
+  BONBONNE
+}
+
+enum CommandeStatut {
+  EN_ATTENTE
+  VALIDEE
+  LIVREE
+}
+
+enum TransactionType {
+  RECETTE
+  DEPENSE
+}
+
+enum RapportType {
+  JOURNALIER
+  MENSUEL
+}
+
+enum NotificationType {
+  STOCK_FAIBLE
+  LIVRAISON_PREVUE
+}
+
+model Utilisateur {
+  idUtilisateur String   @id @default(uuid())
+  nom           String
+  email         String   @unique
+  role          Role
+  motDePasse    String
+  createdAt     DateTime @default(now())
+
+  @@map("utilisateurs")
+}
+
+model Client {
+  idClient   String    @id @default(uuid())
+  nomClient  String
+  telephone  String
+  adresse    String
+  commandes  Commande[]
+  createdAt  DateTime  @default(now())
+
+  @@map("clients")
+}
+
+model Produit {
+  codeProduit  String   @id
+  nomProduit   String
+  format       Format
+  categorie    String
+  stockInitial Int
+  stockMinimum Int
+  prixUnitaire Float
+  fournisseur  String
+  lignes       LigneCommande[]
+  notifications Notification[]
+
+  @@map("produits")
+}
+
+model Commande {
+  idCommande   String           @id @default(uuid())
+  dateCommande DateTime         @default(now())
+  statut       CommandeStatut   @default(EN_ATTENTE)
+  clientId     String
+  client       Client           @relation(fields: [clientId], references: [idClient])
+  lignes       LigneCommande[]
+  vente        Vente?
+
+  @@map("commandes")
+}
+
+model LigneCommande {
+  idLigne      String   @id @default(uuid())
+  commandeId   String
+  commande     Commande @relation(fields: [commandeId], references: [idCommande])
+  produitId    String
+  produit      Produit  @relation(fields: [produitId], references: [codeProduit])
+  quantite     Int
+  prixUnitaire Float
+  totalLigne   Float
+
+  @@map("lignes_commande")
+}
+
+model Vente {
+  idVente    String   @id @default(uuid())
+  dateVente  DateTime @default(now())
+  montantTotal Float
+  modePaiement String
+  commandeId  String? @unique
+  commande    Commande? @relation(fields: [commandeId], references: [idCommande])
+  facture     Facture?
+  transaction Transaction?
+
+  @@map("ventes")
+}
+
+model Facture {
+  idFacture    String   @id @default(uuid())
+  numeroFacture String
+  dateFacture  DateTime @default(now())
+  montant      Float
+  venteId      String   @unique
+  vente        Vente    @relation(fields: [venteId], references: [idVente])
+
+  @@map("factures")
+}
+
+model Transaction {
+  idTransaction String   @id @default(uuid())
+  typeTransaction TransactionType
+  categorie     String
+  description   String?
+  montant       Float
+  reference     String?
+  venteId       String?  @unique
+  vente         Vente?   @relation(fields: [venteId], references: [idVente])
+  createdAt     DateTime @default(now())
+
+  @@map("transactions")
+}
+
+model Rapport {
+  idRapport        String      @id @default(uuid())
+  typeRapport      RapportType
+  periode          String
+  donneesStatistiques Json
+  createdAt        DateTime    @default(now())
+
+  @@map("rapports")
+}
+
+model Notification {
+  idNotification String           @id @default(uuid())
+  type           NotificationType
+  message        String
+  dateEnvoi      DateTime         @default(now())
+  produitId      String?
+  produit        Produit?         @relation(fields: [produitId], references: [codeProduit])
+
+  @@map("notifications")
+}
