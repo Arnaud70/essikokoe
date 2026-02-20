@@ -13,11 +13,14 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api-docs', app, document);
+  // expose Swagger UI at /api/docs
+  SwaggerModule.setup('api/docs', app, document);
 
   const port = process.env.PORT ?? 9000;
   await app.listen(port);
-  // Swagger will be available at: http://localhost:<port>/api-docs
+  // Startup messages shown when the server is ready
+  console.log(`Backend esikokoe démarré sur http://localhost:${port}`);
+  console.log(`Swagger disponible sur http://localhost:${port}/api/docs`);
 }
 
 bootstrap();

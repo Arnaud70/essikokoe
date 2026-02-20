@@ -20,8 +20,40 @@ export class StockService {
   constructor(private prisma: PrismaService) {}
 
   /**
+   * 🔧 HELPER: Calculer le stock réel à partir des mouvements
+   * Stock réel = stockInitial + (somme des ENTREES) - (somme des SORTIES)
+   */
+  private async calculateRealStock(codeProduit: string): Promise<number> {
+    const produit = await this.prisma.produit.findUnique({
+      where: { codeProduit },
+    });
+
+    if (!produit) {
+      throw new NotFoundException(
+        `Produit avec code ${codeProduit} non trouvé`,
+      );
+    }
+
+    const mouvements = await this.prisma.stockMovement.findMany({
+      where: { codeProduit },
+    });
+
+    let stockReel = produit.stockInitial;
+    mouvements.forEach((m) => {
+      if (m.type === 'ENTREE') {
+        stockReel += m.quantite;
+      } else if (m.type === 'SORTIE') {
+        stockReel -= m.quantite;
+      }
+    });
+
+    return Math.max(0, stockReel); // Le stock ne peut pas être négatif
+  }
+
+  /**
    * 📥 ENREGISTREMENT D'ENTRÉE DE STOCK
    * Ajoute des unités au stock d'un produit (livraison, retour, etc.)
+   * Crée un mouvement tracé dans StockMovement
    */
   async registerStockEntry(dto: CreateStockEntryDto): Promise<{
     message: string;
@@ -47,29 +79,31 @@ export class StockService {
       );
     }
 
-    // Nœud dynamique : un produit peut avoir un stock initial, on le met à jour
-    const nouveauStock = produit.stockInitial + dto.quantite;
-
-    // Mettre à jour le stock initial du produit
-    const updated = await this.prisma.produit.update({
-      where: { codeProduit: dto.codeProduit },
-      data: { stockInitial: nouveauStock },
+    // 🔴 NOUVEAU: Créer le mouvement de stock
+    const mouvement = await this.prisma.stockMovement.create({
+      data: {
+        codeProduit: dto.codeProduit,
+        type: 'ENTREE',
+        quantite: dto.quantite,
+        motif: dto.motif,
+      },
     });
 
-    // Enregistrer le mouvement dans la table de logs (optionnel, si you have a StockMovement table)
-    // await this.prisma.stockMovement.create({ ... });
+    // Calculer le nouveau stock réel
+    const nouveauStock = await this.calculateRealStock(dto.codeProduit);
 
     return {
       message: 'Entrée de stock enregistrée avec succès',
       codeProduit: dto.codeProduit,
       quantiteAjoutee: dto.quantite,
-      nouveauStock: updated.stockInitial,
+      nouveauStock,
     };
   }
 
   /**
    * 📤 DÉDUCTION AUTOMATIQUE APRÈS VENTE
    * Réduit le stock dès qu'une vente est confirmée
+   * Crée un mouvement SORTIE tracé dans StockMovement
    */
   async deductStockAfterSale(dto: DeductStockDto): Promise<{
     message: string;
@@ -89,33 +123,39 @@ export class StockService {
     }
 
     // Vérifier qu'il y a assez de stock
-    if (produit.stockInitial < dto.quantite) {
+    const stockActuel = await this.calculateRealStock(dto.codeProduit);
+    if (stockActuel < dto.quantite) {
       throw new BadRequestException(
-        `Stock insuffisant. Disponible: ${produit.stockInitial}, Demandé: ${dto.quantite}`,
+        `Stock insuffisant. Disponible: ${stockActuel}, Demandé: ${dto.quantite}`,
       );
     }
 
-    const nouveauStock = produit.stockInitial - dto.quantite;
-
-    // Mettre à jour le stock
-    const updated = await this.prisma.produit.update({
-      where: { codeProduit: dto.codeProduit },
-      data: { stockInitial: nouveauStock },
+    // 🔴 NOUVEAU: Créer le mouvement de sortie
+    await this.prisma.stockMovement.create({
+      data: {
+        codeProduit: dto.codeProduit,
+        type: 'SORTIE',
+        quantite: dto.quantite,
+        motif: 'Vente',
+      },
     });
 
+    // Calculer le nouveau stock réel
+    const nouveauStock = await this.calculateRealStock(dto.codeProduit);
+
     // Vérifier si le stock est critique après déduction
-    const estCritique = updated.stockInitial <= updated.stockMinimum;
+    const estCritique = nouveauStock <= produit.stockMinimum;
 
     // Si critique, créer une notification
     if (estCritique) {
-      await this.createStockAlertNotification(updated);
+      await this.createStockAlertNotification(produit, nouveauStock);
     }
 
     return {
       message: 'Déduction de stock effectuée',
       codeProduit: dto.codeProduit,
       quantiteDeduite: dto.quantite,
-      nouveauStock: updated.stockInitial,
+      nouveauStock,
       estCritique,
     };
   }
@@ -123,28 +163,32 @@ export class StockService {
   /**
    * 👁️ CONSULTATION DE L'INVENTAIRE
    * Retourne l'état complet du stock avec alertes visuelles
+   * Stock calculé à partir des mouvements
    */
   async getInventory(): Promise<StockInventoryResponseDto> {
     const produits = await this.prisma.produit.findMany();
 
-    const inventaire: StockInventoryDto[] = produits.map((p) => {
-      const estCritique = p.stockInitial <= p.stockMinimum;
-      const pourcentageDisponibilité =
-        p.stockInitial > 0
-          ? Math.round((p.stockInitial / (p.stockInitial + p.stockMinimum)) * 100)
-          : 0;
+    const inventaire: StockInventoryDto[] = await Promise.all(
+      produits.map(async (p) => {
+        const stockActuel = await this.calculateRealStock(p.codeProduit);
+        const estCritique = stockActuel <= p.stockMinimum;
+        const pourcentageDisponibilité =
+          stockActuel > 0
+            ? Math.round((stockActuel / (stockActuel + p.stockMinimum)) * 100)
+            : 0;
 
-      return {
-        codeProduit: p.codeProduit,
-        nomProduit: p.nomProduit,
-        format: p.format,
-        stockActuel: p.stockInitial,
-        stockMinimum: p.stockMinimum,
-        prixUnitaire: p.prixUnitaire,
-        estCritique,
-        pourcentageDisponibilité,
-      };
-    });
+        return {
+          codeProduit: p.codeProduit,
+          nomProduit: p.nomProduit,
+          format: p.format,
+          stockActuel,
+          stockMinimum: p.stockMinimum,
+          prixUnitaire: p.prixUnitaire,
+          estCritique,
+          pourcentageDisponibilité,
+        };
+      }),
+    );
 
     const produitsEnAlerte = inventaire.filter((inv) => inv.estCritique).length;
     const stockTotal = inventaire.reduce((acc, inv) => acc + inv.stockActuel, 0);
@@ -159,13 +203,15 @@ export class StockService {
 
   /**
    * 📊 SUIVI PAR TYPE DE PRODUIT (SACHET / BOUTEILLE / BONBONNE)
+   * Stock calculé à partir des mouvements
    */
   async getStockByFormat(): Promise<StockByFormatResponseDto> {
     const produits = await this.prisma.produit.findMany();
 
     const mapFormat = new Map<string, StockByFormatDto>();
 
-    produits.forEach((p) => {
+    for (const p of produits) {
+      const stockActuel = await this.calculateRealStock(p.codeProduit);
       const format = p.format;
       const existing = mapFormat.get(format) || {
         format,
@@ -174,12 +220,12 @@ export class StockService {
         valeurTotale: 0,
       };
 
-      existing.quantite += p.stockInitial;
+      existing.quantite += stockActuel;
       existing.nombreProduits += 1;
-      existing.valeurTotale += p.stockInitial * p.prixUnitaire;
+      existing.valeurTotale += stockActuel * p.prixUnitaire;
 
       mapFormat.set(format, existing);
-    });
+    }
 
     const parFormat = Array.from(mapFormat.values());
     const totalUnites = parFormat.reduce((acc, f) => acc + f.quantite, 0);
@@ -219,11 +265,12 @@ export class StockService {
    */
   private async createStockAlertNotification(
     produit: any,
+    stockActuel: number,
   ): Promise<void> {
     await this.prisma.notification.create({
       data: {
         type: 'STOCK_FAIBLE',
-        message: `⚠️ Stock critique pour ${produit.nomProduit} (Code: ${produit.codeProduit}). Stock actuel: ${produit.stockInitial}, Minimum: ${produit.stockMinimum}`,
+        message: `⚠️ Stock critique pour ${produit.nomProduit} (Code: ${produit.codeProduit}). Stock actuel: ${stockActuel}, Minimum: ${produit.stockMinimum}`,
         produitId: produit.codeProduit,
       },
     });
@@ -231,6 +278,7 @@ export class StockService {
 
   /**
    * 📈 ANALYTICS POUR DASHBOARD
+   * Utilise le stock réel calculé à partir des mouvements
    */
   async getStockDashboardMetrics(): Promise<{
     stockTotal: number;
@@ -241,19 +289,23 @@ export class StockService {
   }> {
     const produits = await this.prisma.produit.findMany();
 
-    const stockTotal = produits.reduce((acc, p) => acc + p.stockInitial, 0);
-    const valeurTotalStock = produits.reduce(
-      (acc, p) => acc + p.stockInitial * p.prixUnitaire,
-      0,
-    );
-    const produitsEnAlerte = produits.filter(
-      (p) => p.stockInitial <= p.stockMinimum,
-    ).length;
-
+    let stockTotal = 0;
+    let valeurTotalStock = 0;
+    let produitsEnAlerte = 0;
     const distribuitionParFormat = {};
-    produits.forEach((p) => {
-      distribuitionParFormat[p.format] = (distribuitionParFormat[p.format] || 0) + p.stockInitial;
-    });
+
+    for (const p of produits) {
+      const stockActuel = await this.calculateRealStock(p.codeProduit);
+      stockTotal += stockActuel;
+      valeurTotalStock += stockActuel * p.prixUnitaire;
+
+      if (stockActuel <= p.stockMinimum) {
+        produitsEnAlerte++;
+      }
+
+      distribuitionParFormat[p.format] =
+        (distribuitionParFormat[p.format] || 0) + stockActuel;
+    }
 
     const tauxCouverture =
       produits.length > 0

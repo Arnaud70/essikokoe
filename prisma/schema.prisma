@@ -41,6 +41,11 @@ enum NotificationType {
   LIVRAISON_PREVUE
 }
 
+enum StockMovementType {
+  ENTREE
+  SORTIE
+}
+
 model Utilisateur {
   idUtilisateur String   @id @default(uuid())
   nom           String
@@ -68,12 +73,13 @@ model Produit {
   nomProduit   String
   format       Format
   categorie    String
-  stockInitial Int
+  stockInitial Int      // Stock initial (référence historique)
   stockMinimum Int
   prixUnitaire Float
   fournisseur  String
   lignes       LigneCommande[]
   notifications Notification[]
+  mouvements   StockMovement[]
 
   @@map("produits")
 }
@@ -149,6 +155,19 @@ model Rapport {
   createdAt        DateTime    @default(now())
 
   @@map("rapports")
+}
+
+model StockMovement {
+  id            String              @id @default(uuid())
+  codeProduit   String
+  produit       Produit             @relation(fields: [codeProduit], references: [codeProduit], onDelete: Cascade)
+  type          StockMovementType   // ENTREE ou SORTIE
+  quantite      Int
+  motif         String              // "Livraison fournisseur", "Retour client", "Vente", etc.
+  createdBy     String?             // Email/ID de l'utilisateur qui a fait le mouvement
+  createdAt     DateTime            @default(now())
+
+  @@map("stock_movements")
 }
 
 model Notification {
