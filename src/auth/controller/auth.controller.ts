@@ -7,6 +7,7 @@ import { CreateUserDto } from '../../users/dto/create-user.dto';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { LoginResponseDto } from '../dto/login.response.dto';
 import { UserResponseDto } from '../../users/dto/user.response.dto';
+import { Public } from '../decorators/public.decorator';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -14,6 +15,7 @@ export class AuthController {
   constructor(private authService: AuthService, private usersService: UsersService) {}
 
   @Post('login')
+  @Public()
   @ApiOperation({ summary: 'Login user and receive access + refresh tokens' })
   @ApiResponse({ status: 201, type: LoginResponseDto })
   async login(@Body() loginDto: LoginDto) {
@@ -23,6 +25,7 @@ export class AuthController {
   }
 
   @Post('register')
+  @Public()
   @ApiOperation({ summary: 'Register a new client (role CLIENT)' })
   @ApiResponse({ status: 201, type: UserResponseDto })
   async register(@Body() dto: CreateUserDto) {
