@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsPositive } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsPositive, IsUUID } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class FactureDto {
@@ -26,7 +26,7 @@ export class CreateFactureDto {
     description: 'ID de la vente',
     example: '550e8400-e29b-41d4-a716-446655440000',
   })
-  @IsString()
+  @IsUUID()
   venteId: string;
 
   @ApiProperty({

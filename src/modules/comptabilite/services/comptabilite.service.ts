@@ -36,7 +36,10 @@ export class ComptabiliteService {
 
   async getTransactions(type?: string) {
     const where: any = {};
-    if (type) where.typeTransaction = type;
+    // Valider que le type est un enum valide (RECETTE ou DEPENSE)
+    if (type && ['RECETTE', 'DEPENSE'].includes(type.toUpperCase())) {
+      where.typeTransaction = type.toUpperCase();
+    }
 
     const transactions = await this.prisma.transaction.findMany({
       where,
@@ -58,7 +61,36 @@ export class ComptabiliteService {
     return transaction;
   }
 
-  // ===== RAPPORTS =====
+  async getDistributionByCategory() {
+    const transactions = await this.prisma.transaction.findMany();
+
+    const distribution = {
+      recettes: {},
+      depenses: {},
+    };
+
+    transactions.forEach((t) => {
+      const type = t.typeTransaction === 'RECETTE' ? 'recettes' : 'depenses';
+      if (!distribution[type][t.categorie]) {
+        distribution[type][t.categorie] = 0;
+      }
+      distribution[type][t.categorie] += t.montant;
+    });
+
+    // Convertir en array pour affichage
+    return {
+      recettes: Object.entries(distribution.recettes).map(([categorie, montant]) => ({
+        categorie,
+        montant,
+      })),
+      depenses: Object.entries(distribution.depenses).map(([categorie, montant]) => ({
+        categorie,
+        montant,
+      })),
+    };
+  }
+
+  // RAPPORTS 
   
   async getRapports() {
     return this.prisma.rapport.findMany({
@@ -103,6 +135,69 @@ export class ComptabiliteService {
     return { message: 'Bilan créé', bilan };
   }
 
+  async getBilanSummary() {
+    // Récupérer les transactions
+    const transactions = await this.prisma.transaction.findMany();
+    
+    // Récupérer le stock total
+    const stock = await this.prisma.produit.findMany();
+    const totalStock = stock.reduce((acc, p) => {
+      // Calculer le stock actuel basé sur les mouvements
+      return acc + (p.stockInitial * p.prixUnitaire);
+    }, 0);
+
+    // Calculer les actifs
+    let tresorerie = 0;
+    let creancesClients = 0;
+
+    // Calculer basé sur les recettes/dépenses
+    transactions.forEach((t) => {
+      if (t.typeTransaction === 'RECETTE' && t.categorie === 'Ventes') {
+        tresorerie += t.montant;
+      } else if (t.typeTransaction === 'DEPENSE') {
+        tresorerie -= t.montant;
+      }
+      if (t.categorie === 'Créances clients') {
+        creancesClients += t.montant;
+      }
+    });
+
+    const totalActifs = Math.max(0, tresorerie) + totalStock + creancesClients;
+
+    // Calculer les passifs
+    let dettesFournisseurs = 0;
+    let chargesAPayer = 0;
+    let capital = 2000000; // Valeur par défaut
+
+    transactions.forEach((t) => {
+      if (t.typeTransaction === 'DEPENSE') {
+        if (t.categorie === 'Approvisionnement') {
+          dettesFournisseurs += t.montant;
+        } else if (t.categorie === 'Charges à payer' || t.categorie === 'Salaires') {
+          chargesAPayer += t.montant;
+        }
+      }
+    });
+
+    const totalPassifs = dettesFournisseurs + chargesAPayer + capital;
+
+    return {
+      actifs: {
+        tresorerie: Math.max(0, tresorerie),
+        stock: totalStock,
+        creancesClients,
+        totalActifs,
+      },
+      passifs: {
+        dettesFournisseurs,
+        chargesAPayer,
+        capital,
+        totalPassifs,
+      },
+      resultat: totalActifs - totalPassifs,
+    };
+  }
+
   // ===== AUDIT =====
   
   async getAudit() {
@@ -110,5 +205,149 @@ export class ComptabiliteService {
       orderBy: { createdAt: 'desc' },
       take: 100
     });
+  }
+
+  async getAuditStatus() {
+    const transactions = await this.prisma.transaction.findMany();
+    const bilanData = await this.getBilanSummary();
+
+    const transactionsVerifiees = transactions.length;
+    const detailsEcarts: any[] = [];
+
+    // Vérifier si le bilan est équilibré
+    const difference = bilanData.actifs.totalActifs - bilanData.passifs.totalPassifs;
+    
+    if (Math.abs(difference) > 0.01) {
+      detailsEcarts.push({
+        description: 'Déséquilibre du bilan',
+        montant: Math.abs(difference),
+        dateDetection: new Date(),
+      });
+    }
+
+    const statut = detailsEcarts.length === 0 ? 'Conforme' : 'Non conforme';
+
+    return {
+      transactionsVerifiees,
+      ecartsDetectes: detailsEcarts.length,
+      statut,
+      detailsEcarts,
+    };
+  }
+
+  async verifyEquilibration() {
+    const bilanData = await this.getBilanSummary();
+
+    const totalActifs = bilanData.actifs.totalActifs;
+    const totalPassifs = bilanData.passifs.totalPassifs;
+    const difference = totalActifs - totalPassifs;
+
+    return {
+      totalActifs,
+      totalPassifs,
+      difference,
+      equilibre: Math.abs(difference) < 0.01,
+    };
+  }
+
+  async analyzeTrends() {
+    const transactions = await this.prisma.transaction.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Calculer les totaux actuels
+    let totalRecettes = 0;
+    let totalDepenses = 0;
+
+    transactions.forEach((t) => {
+      if (t.typeTransaction === 'RECETTE') {
+        totalRecettes += t.montant;
+      } else {
+        totalDepenses += t.montant;
+      }
+    });
+
+    const resultatNet = totalRecettes - totalDepenses;
+
+    // Analyser les tendances (basé sur les 30 derniers jours)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const transactionsRecentes = transactions.filter(
+      (t) => new Date(t.createdAt) > thirtyDaysAgo
+    );
+
+    let recettesRecentes = 0;
+    let depensesRecentes = 0;
+
+    transactionsRecentes.forEach((t) => {
+      if (t.typeTransaction === 'RECETTE') {
+        recettesRecentes += t.montant;
+      } else {
+        depensesRecentes += t.montant;
+      }
+    });
+
+    const tauxCroissance =
+      totalRecettes > 0 ? ((recettesRecentes - totalRecettes) / totalRecettes) * 100 : 0;
+
+    let tendance: 'Hausse' | 'Baisse' | 'Stable' = 'Stable';
+    if (tauxCroissance > 5) tendance = 'Hausse';
+    if (tauxCroissance < -5) tendance = 'Baisse';
+
+    return {
+      periode: '30 derniers jours',
+      totalRecettes,
+      totalDepenses,
+      resultatNet,
+      tauxCroissance: Math.round(tauxCroissance * 100) / 100,
+      tendance,
+    };
+  }
+
+  async generateAuditReport() {
+    const auditStatus = await this.getAuditStatus();
+    const equilibration = await this.verifyEquilibration();
+    const trends = await this.analyzeTrends();
+    const bilanData = await this.getBilanSummary();
+
+    return {
+      dateGeneration: new Date(),
+      auditStatus,
+      equilibration,
+      trends,
+      bilanData,
+      recommandations: this.generateRecommandations(auditStatus, equilibration, trends),
+    };
+  }
+
+  private generateRecommandations(
+    auditStatus: any,
+    equilibration: any,
+    trends: any
+  ): string[] {
+    const recommandations: string[] = [];
+
+    if (!equilibration.equilibre) {
+      recommandations.push('Vérifier le déséquilibre du bilan détecté');
+    }
+
+    if (auditStatus.ecartsDetectes > 0) {
+      recommandations.push('Analyser les écarts détectés et prendre des mesures correctives');
+    }
+
+    if (trends.tendance === 'Baisse') {
+      recommandations.push('Analyser la baisse des recettes et prendre des mesures appropriées');
+    }
+
+    if (trends.totalDepenses > trends.totalRecettes * 0.8) {
+      recommandations.push('Les dépenses approchent les recettes, contrôler les dépenses');
+    }
+
+    if (recommandations.length === 0) {
+      recommandations.push('Situation financière saine, continuez le suivi régulier');
+    }
+
+    return recommandations;
   }
 }
