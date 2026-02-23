@@ -7,6 +7,7 @@ import { ProduitsModule } from './modules/produits/produits.module';
 import { VentesModule } from './modules/ventes/ventes.module';
 import { ClientsModule } from './modules/clients/clients.module';
 import { FacturesModule } from './modules/factures/factures.module';
+import { ComptabiliteModule } from './modules/comptabilite/comptabilite.module';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 
@@ -20,6 +21,7 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
     VentesModule,
     ClientsModule,
     FacturesModule,
+    ComptabiliteModule,
   ],
   controllers: [],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],

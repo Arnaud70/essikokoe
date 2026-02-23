@@ -180,3 +180,38 @@ model Notification {
 
   @@map("notifications")
 }
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  EXPORT
+}
+
+model Bilan {
+  idBilan     String   @id @default(uuid())
+  exercice    String
+  dateGeneration DateTime @default(now())
+  actifImmobilise Float @default(0)
+  actifCirculant  Float @default(0)
+  totalActif      Float
+  capitauxPropres Float @default(0)
+  dettes          Float @default(0)
+  totalPassif     Float
+  generePar   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@map("bilans")
+}
+
+model AuditLog {
+  idAudit   String   @id @default(uuid())
+  action    AuditAction
+  entite    String
+  idEntite  String
+  userId    String?
+  ancienValeurs Json?
+  nouveauValeurs Json?
+  createdAt DateTime @default(now())
+  @@map("audit_logs")
+}
