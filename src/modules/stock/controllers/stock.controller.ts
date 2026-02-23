@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Body,
+  Query,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
@@ -12,6 +13,7 @@ import {
   ApiBearerAuth,
   ApiResponse,
   ApiBody,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { StockService } from '../services/stock.service';
 import { CreateStockEntryDto } from '../dtos/create-stock-entry.dto';
@@ -28,7 +30,7 @@ export class StockController {
   constructor(private stockService: StockService) {}
 
   /**
-   * 📥 Enregistrer une entrée de stock
+   *  Enregistrer une entrée de stock
    * @route POST /stock/entry
    */
   @Post('entry')
@@ -154,7 +156,7 @@ export class StockController {
   }
 
   /**
-   * 📊 Stock par type de produit (SACHET / BOUTEILLE / BONBONNE)
+   *  Stock par type de produit (SACHET / BOUTEILLE / BONBONNE)
    * @route GET /stock/by-format
    */
   @Get('by-format')
@@ -174,7 +176,7 @@ export class StockController {
   }
 
   /**
-   * 🔔 Produits en alerte (seuils critiques)
+   *  Produits en alerte (seuils critiques)
    * @route GET /stock/critical
    */
   @Get('critical')
@@ -209,7 +211,7 @@ export class StockController {
   }
 
   /**
-   * 📈 Métriques pour dashboard administrateur
+   *  Métriques pour dashboard administrateur
    * @route GET /stock/dashboard
    */
   @Get('dashboard')  @Public()  @Roles('ADMIN')
@@ -235,5 +237,59 @@ export class StockController {
   })
   async getDashboardMetrics() {
     return await this.stockService.getStockDashboardMetrics();
+  }
+
+  /**
+   *  Historique des mouvements de stock
+   * @route GET /stock/history
+   */
+  @Get('history')
+  @Public()
+  @ApiOperation({
+    summary: 'Historique des mouvements de stock',
+    description:
+      'Retourne la liste de tous les mouvements de stock (entrées et sorties)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    description: 'Nombre maximum de mouvements à retourner',
+    example: 100,
+    required: false,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Historique des mouvements récupéré',
+    example: {
+      total: 2,
+      mouvements: [
+        {
+          id: '550e8400-e29b-41d4-a716-446655440000',
+          date: '2024-01-15T14:30:00Z',
+          produit: 'Eau Pure - Sachet',
+          codeProduit: 'PROD-001',
+          type: '+',
+          typeLabel: 'ENTREE',
+          quantite: 500,
+          motif: 'Livraison fournisseur',
+          reference: '550E8400',
+          utilisateur: 'Admin',
+        },
+        {
+          id: '650f9500-f40c-52e5-b827-557766551111',
+          date: '2024-01-15T10:15:00Z',
+          produit: 'Eau Pure - Bouteille 1.5L',
+          codeProduit: 'PROD-002',
+          type: '-',
+          typeLabel: 'SORTIE',
+          quantite: 25,
+          motif: 'Vente',
+          reference: '650F9500',
+          utilisateur: 'Vendeur1',
+        },
+      ],
+    },
+  })
+  async getStockHistory(@Query('limit') limit?: number) {
+    return await this.stockService.getStockMovementHistory(limit || 100);
   }
 }

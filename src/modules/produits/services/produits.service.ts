@@ -2,7 +2,6 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
-  ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateProduitDto } from '../dtos/create-produit.dto';
@@ -15,26 +14,75 @@ export class ProduitsService {
   constructor(private prisma: PrismaService) {}
 
   /**
+   * 🔧 HELPER: Calculer le stock réel à partir des mouvements
+   * Stock réel = stockInitial + (somme des ENTREES) - (somme des SORTIES)
+   */
+  private async calculateRealStock(codeProduit: string): Promise<number> {
+    const produit = await this.prisma.produit.findUnique({
+      where: { codeProduit },
+    });
+
+    if (!produit) {
+      throw new NotFoundException(
+        `Produit avec code ${codeProduit} non trouvé`,
+      );
+    }
+
+    const mouvements = await this.prisma.stockMovement.findMany({
+      where: { codeProduit },
+    });
+
+    let stockReel = produit.stockInitial;
+    mouvements.forEach((m) => {
+      if (m.type === 'ENTREE') {
+        stockReel += m.quantite;
+      } else if (m.type === 'SORTIE') {
+        stockReel -= m.quantite;
+      }
+    });
+
+    return Math.max(0, stockReel);
+  }
+
+  /**
+   * 🔧 HELPER: Déterminer le statut du produit
+   */
+  private getStatut(stock: number, stockMinimum: number): string {
+    return stock < stockMinimum ? 'Stock Faible' : 'En stock';
+  }
+
+  /**
+   * 🔧 HELPER: Mapper un produit vers le DTO avec stock et statut
+   */
+  private async mapProduitToDto(produit: any): Promise<any> {
+    const stock = await this.calculateRealStock(produit.codeProduit);
+    const statut = this.getStatut(stock, produit.stockMinimum);
+
+    return {
+      codeProduit: produit.codeProduit,
+      nomProduit: produit.nomProduit,
+      format: produit.format,
+      stock: stock,
+      statut: statut,
+      prixUnitaire: produit.prixUnitaire,
+      fournisseur: produit.fournisseur,
+    };
+  }
+
+  /**
    * 🆕 CRÉER UN NOUVEAU PRODUIT
    */
   async createProduit(dto: CreateProduitDto): Promise<{
     message: string;
     produit: any;
   }> {
-    // Vérifier que le code n'existe pas
-    const existing = await this.prisma.produit.findUnique({
-      where: { codeProduit: dto.codeProduit },
-    });
-
-    if (existing) {
-      throw new ConflictException(
-        `Un produit avec le code ${dto.codeProduit} existe déjà`,
-      );
-    }
+    // Générer automatiquement le code du produit
+    const count = await this.prisma.produit.count();
+    const codeProduit = `PROD-${String(count + 1).padStart(3, '0')}`;
 
     const produit = await this.prisma.produit.create({
       data: {
-        codeProduit: dto.codeProduit,
+        codeProduit: codeProduit,
         nomProduit: dto.nomProduit,
         format: dto.format,
         categorie: dto.categorie,
@@ -76,9 +124,13 @@ export class ProduitsService {
       orderBy: { codeProduit: 'asc' },
     });
 
+    const produitsWithStock = await Promise.all(
+      produits.map((p) => this.mapProduitToDto(p)),
+    );
+
     return {
-      total: produits.length,
-      produits: produits as any,
+      total: produitsWithStock.length,
+      produits: produitsWithStock as any,
     };
   }
 
@@ -96,9 +148,13 @@ export class ProduitsService {
       },
     });
 
+    const produitsWithStock = await Promise.all(
+      produits.map((p) => this.mapProduitToDto(p)),
+    );
+
     return {
-      total: produits.length,
-      produits: produits as any,
+      total: produitsWithStock.length,
+      produits: produitsWithStock as any,
     };
   }
 
@@ -118,9 +174,13 @@ export class ProduitsService {
       );
     }
 
+    const produitsWithStock = await Promise.all(
+      produits.map((p) => this.mapProduitToDto(p)),
+    );
+
     return {
-      total: produits.length,
-      produits: produits as any,
+      total: produitsWithStock.length,
+      produits: produitsWithStock as any,
     };
   }
 

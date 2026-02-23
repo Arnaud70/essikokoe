@@ -4,15 +4,8 @@ import { Format } from '@prisma/client';
 
 export class CreateProduitDto {
   @ApiProperty({
-    description: 'Code unique du produit',
-    example: 'PROD-001',
-  })
-  @IsString()
-  codeProduit: string;
-
-  @ApiProperty({
     description: 'Nom du produit',
-    example: 'Eau Esikokoé - Sachet',
+    example: 'Eau Pure',
   })
   @IsString()
   nomProduit: string;
@@ -20,7 +13,7 @@ export class CreateProduitDto {
   @ApiProperty({
     description: 'Format de distribution',
     enum: ['SACHET', 'BOUTEILLE', 'BONBONNE'],
-    example: 'SACHET',
+    example: 'BOUTEILLE',
   })
   @IsEnum(Format)
   format: Format;
@@ -34,7 +27,7 @@ export class CreateProduitDto {
 
   @ApiProperty({
     description: 'Stock initial du produit',
-    example: 1000,
+    example: 0,
     type: 'integer',
   })
   @IsInt()
@@ -43,7 +36,7 @@ export class CreateProduitDto {
 
   @ApiProperty({
     description: 'Stock minimum pour alerte',
-    example: 100,
+    example: 0,
     type: 'integer',
   })
   @IsInt()
@@ -52,7 +45,7 @@ export class CreateProduitDto {
 
   @ApiProperty({
     description: 'Prix unitaire en FCFA',
-    example: 500.5,
+    example: 0,
     type: 'number',
   })
   @IsPositive()
@@ -60,7 +53,7 @@ export class CreateProduitDto {
 
   @ApiProperty({
     description: 'Nom du fournisseur',
-    example: 'Fournisseur Principal SARL',
+    example: 'Nom du fournisseur',
   })
   @IsString()
   fournisseur: string;

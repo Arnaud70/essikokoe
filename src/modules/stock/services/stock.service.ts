@@ -322,4 +322,56 @@ export class StockService {
       tauxCouverture,
     };
   }
+
+  /**
+   *  HISTORIQUE DES MOUVEMENTS DE STOCK
+   */
+  async getStockMovementHistory(limit: number = 100): Promise<any> {
+    // Convertir en entier et borner entre 1 et 1000
+    const limitInt = Math.max(1, Math.min(parseInt(String(limit), 10) || 100, 1000));
+
+    const mouvements = await this.prisma.stockMovement.findMany({
+      include: {
+        produit: {
+          select: {
+            codeProduit: true,
+            nomProduit: true,
+            format: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limitInt,
+    });
+
+    const historique = mouvements.map((m) => ({
+      id: m.id,
+      date: m.createdAt,
+      produit: `${m.produit.nomProduit} - ${this.getFormatLabel(m.produit.format)}`,
+      codeProduit: m.codeProduit,
+      type: m.type === 'ENTREE' ? '+' : '-',
+      typeLabel: m.type,
+      quantite: m.quantite,
+      motif: m.motif,
+      reference: m.id.substring(0, 8).toUpperCase(), // Simuler une référence
+      utilisateur: m.createdBy || 'System',
+    }));
+
+    return {
+      total: historique.length,
+      mouvements: historique,
+    };
+  }
+
+  /**
+   * 🔧 HELPER: Obtenir le label du format
+   */
+  private getFormatLabel(format: string): string {
+    const labels = {
+      SACHET: 'Sachet',
+      BOUTEILLE: 'Bouteille 1.5L',
+      BONBONNE: 'Bonbonne',
+    };
+    return labels[format] || format;
+  }
 }

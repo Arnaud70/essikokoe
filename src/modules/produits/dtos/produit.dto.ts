@@ -10,14 +10,11 @@ export class ProduitDto {
   @ApiProperty({ example: 'SACHET' })
   format: string;
 
-  @ApiProperty({ example: 'Eau minérale' })
-  categorie: string;
+  @ApiProperty({ example: 950 })
+  stock: number;
 
-  @ApiProperty({ example: 1000 })
-  stockInitial: number;
-
-  @ApiProperty({ example: 100 })
-  stockMinimum: number;
+  @ApiProperty({ example: 'En stock', enum: ['En stock', 'Stock Faible'] })
+  statut: string;
 
   @ApiProperty({ example: 500.5 })
   prixUnitaire: number;
@@ -37,9 +34,8 @@ export class ProduitListResponseDto {
         codeProduit: 'PROD-001',
         nomProduit: 'Eau Esikokoé - Sachet',
         format: 'SACHET',
-        categorie: 'Eau minérale',
-        stockInitial: 1000,
-        stockMinimum: 100,
+        stock: 950,
+        statut: 'En stock',
         prixUnitaire: 500.5,
         fournisseur: 'Fournisseur Principal SARL',
       },
