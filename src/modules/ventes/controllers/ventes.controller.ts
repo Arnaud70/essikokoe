@@ -237,7 +237,7 @@ export class VentesController {
 
   
    //SUPPRIMER / ANNULER UNE VENTE
-   
+  
   @Delete(':idVente')
   @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)

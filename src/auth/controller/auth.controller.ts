@@ -4,13 +4,14 @@ import { LoginDto } from '../dto/login.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { UsersService } from '../../users/service/users.service';
 import { CreateUserDto } from '../../users/dto/create-user.dto';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { LoginResponseDto } from '../dto/login.response.dto';
 import { UserResponseDto } from '../../users/dto/user.response.dto';
 import { Public } from '../decorators/public.decorator';
 
 @ApiTags('auth')
 @Controller('auth')
+@ApiBearerAuth()
 export class AuthController {
   constructor(private authService: AuthService, private usersService: UsersService) {}
 

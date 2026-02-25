@@ -140,7 +140,6 @@ export class StockController {
    */
   @Get('inventory')
   @Public()
-  @Roles('ADMIN', 'AGENT', 'CLIENT')
   @ApiOperation({
     summary: 'Consulter l\'inventaire complet',
     description:
@@ -161,7 +160,6 @@ export class StockController {
    */
   @Get('by-format')
   @Public()
-  @Roles('ADMIN', 'AGENT', 'CLIENT')
   @ApiOperation({
     summary: 'Stock agrégé par format de produit',
     description: 'Retourne les totaux pour SACHET, BOUTEILLE, BONBONNE',
@@ -181,7 +179,6 @@ export class StockController {
    */
   @Get('critical')
   @Public()
-  @Roles('ADMIN', 'AGENT')
   @ApiOperation({
     summary: 'Détail des produits en stock critique',
     description:

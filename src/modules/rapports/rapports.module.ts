@@ -1,12 +1,14 @@
 import { Module } from '@nestjs/common';
+import { RapportsController } from './controllers/rapports.controller';
+import { RapportsService } from './services/rapports.service';
+import { ProduitsModule } from '../produits/produits.module';
+import { VentesModule } from '../ventes/ventes.module';
 import { PrismaModule } from '../../prisma/prisma.module';
-import { RapportService } from './services/rapport.service';
-import { RapportController } from './controllers/rapport.controller';
-import { RapportClientsController } from './controllers/rapport-clients.controller';
 
 @Module({
-  imports: [PrismaModule],
-  providers: [RapportService],
-  controllers: [RapportController, RapportClientsController],
+  imports: [ProduitsModule, VentesModule, PrismaModule],
+  controllers: [RapportsController],
+  providers: [RapportsService],
+  exports: [RapportsService],
 })
-export class RapportModule {}
+export class RapportsModule {}
