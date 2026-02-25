@@ -8,7 +8,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { ComptabiliteService } from '../services/comptabilite.service';
 import { Public } from '../../../auth/decorators/public.decorator';
 import { Roles } from '../../../auth/decorators/roles.decorator';
@@ -24,6 +24,7 @@ import { AuditStatusDto, AuditEquilibrationDto, AuditTrendDto } from '../dtos/au
 
 @ApiTags('Comptabilité')
 @Controller('comptabilite')
+@ApiBearerAuth()
 export class ComptabiliteController {
   constructor(private readonly comptabiliteService: ComptabiliteService) {}
 

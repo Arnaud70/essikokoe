@@ -8,8 +8,10 @@ import { VentesModule } from './modules/ventes/ventes.module';
 import { ClientsModule } from './modules/clients/clients.module';
 import { FacturesModule } from './modules/factures/factures.module';
 import { ComptabiliteModule } from './modules/comptabilite/comptabilite.module';
+import { RapportsModule } from './modules/rapports/rapports.module';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { RolesGuard } from './auth/guards/roles.guard';
 
 @Module({
   imports: [
@@ -22,8 +24,12 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
     ClientsModule,
     FacturesModule,
     ComptabiliteModule,
+    RapportsModule,
   ],
   controllers: [],
-  providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
+  providers: [
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: RolesGuard },
+  ],
 })
 export class AppModule {}
