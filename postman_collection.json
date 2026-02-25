@@ -1,0 +1,311 @@
+{
+  "info": {
+    "_postman_id": "eau-esikokoé-api",
+    "name": "Eau Esikokoé - API Complète",
+    "description": "Collection pour tester l'API Eau Esikokoé incluant le système de rapports",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "🔐 Authentification",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"motDePasse\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Se connecter et récupérer le token JWT"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.environment.set(\"access_token\", jsonData.access_token);",
+                  "    pm.test(\"Token sauvegardé\", function () {",
+                  "        pm.expect(pm.environment.get(\"access_token\")).to.exist;",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "📊 Rapports",
+      "item": [
+        {
+          "name": "Rapport Global",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/rapports/global",
+              "host": ["{{base_url}}"],
+              "path": ["rapports", "global"]
+            },
+            "description": "Récupère un rapport agrégé couvrant :\n- Ventes (CA, montant moyen, top produits/clients)\n- Produits (stock, ruptures, format)\n- Clients (nombre, actifs, engagement)\n- Comptabilité (recettes, dépenses, transactions)"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code est 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Le rapport contient les 4 sections\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('ventes');",
+                  "    pm.expect(jsonData).to.have.property('produits');",
+                  "    pm.expect(jsonData).to.have.property('clients');",
+                  "    pm.expect(jsonData).to.have.property('comptabilite');",
+                  "});",
+                  "",
+                  "pm.test(\"Les indicateurs clés sont présents\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.indicateursCles).to.have.property('chiffreAffaires');",
+                  "    pm.expect(jsonData.indicateursCles).to.have.property('soldeNet');",
+                  "    pm.expect(jsonData.indicateursCles).to.have.property('nombreClients');",
+                  "    pm.expect(jsonData.indicateursCles).to.have.property('stockTotal');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "💰 Ventes",
+      "item": [
+        {
+          "name": "Lister toutes les ventes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/ventes",
+              "host": ["{{base_url}}"],
+              "path": ["ventes"]
+            }
+          }
+        },
+        {
+          "name": "Créer une vente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nomClient\": \"Épicerie Test\",\n  \"telephone\": \"+223 XX XX XX XX\",\n  \"adresse\": \"Bamako\",\n  \"modePaiement\": \"ESPECES\",\n  \"produits\": [\n    {\n      \"codeProduit\": \"PROD-001\",\n      \"quantite\": 10,\n      \"prixUnitaire\": 500\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/ventes",
+              "host": ["{{base_url}}"],
+              "path": ["ventes"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📦 Produits",
+      "item": [
+        {
+          "name": "Lister tous les produits",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/produits",
+              "host": ["{{base_url}}"],
+              "path": ["produits"]
+            }
+          }
+        },
+        {
+          "name": "Produits par format",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/produits/by-format",
+              "host": ["{{base_url}}"],
+              "path": ["produits", "by-format"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "👥 Clients",
+      "item": [
+        {
+          "name": "Lister tous les clients",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/clients",
+              "host": ["{{base_url}}"],
+              "path": ["clients"]
+            }
+          }
+        },
+        {
+          "name": "Rechercher des clients",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/clients/search?query=Mali",
+              "host": ["{{base_url}}"],
+              "path": ["clients", "search"],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "Mali"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "💼 Comptabilité",
+      "item": [
+        {
+          "name": "Lister les transactions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/comptabilite/transactions",
+              "host": ["{{base_url}}"],
+              "path": ["comptabilite", "transactions"]
+            }
+          }
+        },
+        {
+          "name": "Résumé du bilan",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/comptabilite/bilan-summary",
+              "host": ["{{base_url}}"],
+              "path": ["comptabilite", "bilan-summary"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
