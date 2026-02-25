@@ -27,15 +27,15 @@ async function main() {
     },
   });
 
-  console.log('✅ Admin user created successfully');
+  console.log(' Admin user created successfully');
   console.log(`Email: ${admin.email}`);
   console.log(`Password: AdminPassword123!`);
-  console.log(`⚠️  Please change this password after first login!`);
+  console.log(`  Please change this password after first login!`);
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Seed failed:', e);
+    console.error(' Seed failed:', e);
     process.exit(1);
   })
   .finally(async () => {
