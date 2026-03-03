@@ -16,6 +16,9 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { StockService } from '../services/stock.service';
+
+import { Request } from '@nestjs/common';
+import type { Request as ExpressRequest } from 'express';
 import { CreateStockEntryDto } from '../dtos/create-stock-entry.dto';
 import { DeductStockDto } from '../dtos/deduct-stock.dto';
 import { StockInventoryResponseDto } from '../dtos/stock-inventory.dto';
@@ -82,12 +85,13 @@ export class StockController {
     status: 404,
     description: 'Produit non trouvé',
   })
-  async registerEntry(@Body() dto: CreateStockEntryDto) {
-    return await this.stockService.registerStockEntry(dto);
+  async registerEntry(@Body() dto: CreateStockEntryDto, @Request() req: ExpressRequest) {
+    const username = req.user?.username || req.user?.email || 'System';
+    return await this.stockService.registerStockEntry(dto, username);
   }
 
   /**
-   * 📤 Déduire du stock après vente
+   *  Déduire du stock après vente
    * @route POST /stock/deduct
    */
   @Post('deduct')
@@ -130,8 +134,9 @@ export class StockController {
     status: 404,
     description: 'Produit non trouvé',
   })
-  async deductStock(@Body() dto: DeductStockDto) {
-    return await this.stockService.deductStockAfterSale(dto);
+  async deductStock(@Body() dto: DeductStockDto, @Request() req: ExpressRequest) {
+    const username = req.user?.username || req.user?.email || 'System';
+    return await this.stockService.deductStockAfterSale(dto, username);
   }
 
   /**

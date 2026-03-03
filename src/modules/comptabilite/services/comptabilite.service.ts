@@ -11,11 +11,19 @@ export class ComptabiliteService {
   // ===== TRANSACTIONS =====
   
   async createTransaction(dto: CreateTransactionDto) {
-    // Si un venteId est fourni, vérifier qu'il existe pour éviter l'erreur de contrainte
-    if (dto.venteId) {
-      const vente = await this.prisma.vente.findUnique({ where: { idVente: dto.venteId } });
+    let venteIdToUse = dto.venteId;
+    // Si une référence facture est fournie, utiliser la vente liée à la facture
+    if (dto.reference) {
+      const facture = await this.prisma.facture.findFirst({ where: { numeroFacture: dto.reference }, include: { vente: true } });
+      if (facture && facture.venteId) {
+        venteIdToUse = facture.venteId;
+      }
+    }
+    // Si un venteId est à utiliser, vérifier qu'il existe
+    if (venteIdToUse) {
+      const vente = await this.prisma.vente.findUnique({ where: { idVente: venteIdToUse } });
       if (!vente) {
-        throw new BadRequestException(`venteId introuvable: ${dto.venteId}`);
+        throw new BadRequestException(`venteId introuvable: ${venteIdToUse}`);
       }
     }
 
@@ -26,8 +34,7 @@ export class ComptabiliteService {
         description: dto.description,
         montant: dto.montant,
         reference: dto.reference,
-        // n'envoyer la clé que si présente (évite null explicite)
-        ...(dto.venteId ? { venteId: dto.venteId } : {}),
+        ...(venteIdToUse ? { venteId: venteIdToUse } : {}),
       },
     });
 

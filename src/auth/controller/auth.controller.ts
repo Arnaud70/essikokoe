@@ -21,8 +21,16 @@ export class AuthController {
   @ApiOperation({ summary: 'Login user and receive access + refresh tokens' })
   @ApiResponse({ status: 201, type: LoginResponseDto })
   async login(@Body() loginDto: LoginDto) {
+    // Vérification email
+    const userByEmail = await this.usersService.findByEmail(loginDto.email);
+    if (!userByEmail) {
+      return { error: 'Votre email est incorrect ou utilisateur non trouvé' };
+    }
+    // Vérification mot de passe
     const user = await this.authService.validateUser(loginDto.email, loginDto.password);
-    if (!user) return { error: 'Invalid credentials' };
+    if (!user) {
+      return { error: 'Mot de passe incorrect' };
+    }
     return this.authService.login(user);
   }
 

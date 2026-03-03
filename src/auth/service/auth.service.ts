@@ -24,15 +24,19 @@ export class AuthService {
   async login(user: any) {
     if (!user) throw new UnauthorizedException();
     const payload = { sub: user.idUtilisateur, email: user.email, role: user.role };
-    const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
-    const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
+    const accessToken = this.jwtService.sign(payload, { expiresIn: '1d' });
+    const refreshPayload = { ...payload, type: 'refresh' };
+    const refreshToken = this.jwtService.sign(refreshPayload, { expiresIn: '7d' });
     return { accessToken, refreshToken };
   }
 
   async refresh(tokenPayload: any) {
     // tokenPayload should already be validated by strategy/guard
-    const payload = { sub: tokenPayload.sub, email: tokenPayload.email };
-    const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
+    if (!tokenPayload.type || tokenPayload.type !== 'refresh') {
+      throw new UnauthorizedException('Token is not a refresh token');
+    }
+    const payload = { sub: tokenPayload.sub, email: tokenPayload.email, role: tokenPayload.role };
+    const accessToken = this.jwtService.sign(payload, { expiresIn: '1d' });
     return { accessToken };
   }
 }
