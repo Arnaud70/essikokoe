@@ -4,6 +4,20 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+   // Configuration CORS avec port 5173
+  app.enableCors({
+    origin: [
+      'http://localhost:3000',   // React/Vue/Angular en dev
+      'http://127.0.0.1:3000',   // Variante locale
+      'http://10.0.2.2:3000',    // Android Emulator
+      'http://localhost',        // Flutter web
+      'http://127.0.0.1',        // Variante Flutter web
+      'http://localhost:5173',   //  Vite (React/Vue/Svelte)
+    ],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    credentials: true,
+  });
 
   const config = new DocumentBuilder()
     .setTitle('Esikokoe API')
