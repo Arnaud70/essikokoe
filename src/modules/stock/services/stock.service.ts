@@ -55,7 +55,7 @@ export class StockService {
    * Ajoute des unités au stock d'un produit (livraison, retour, etc.)
    * Crée un mouvement tracé dans StockMovement
    */
-  async registerStockEntry(dto: CreateStockEntryDto): Promise<{
+  async registerStockEntry(dto: CreateStockEntryDto, username: string): Promise<{
     message: string;
     codeProduit: string;
     quantiteAjoutee: number;
@@ -86,6 +86,7 @@ export class StockService {
         type: 'ENTREE',
         quantite: dto.quantite,
         motif: dto.motif,
+        createdBy: username,
       },
     });
 
@@ -105,7 +106,7 @@ export class StockService {
    * Réduit le stock dès qu'une vente est confirmée
    * Crée un mouvement SORTIE tracé dans StockMovement
    */
-  async deductStockAfterSale(dto: DeductStockDto): Promise<{
+  async deductStockAfterSale(dto: DeductStockDto, username: string): Promise<{
     message: string;
     codeProduit: string;
     quantiteDeduite: number;
@@ -137,6 +138,7 @@ export class StockService {
         type: 'SORTIE',
         quantite: dto.quantite,
         motif: 'Vente',
+        createdBy: username,
       },
     });
 
