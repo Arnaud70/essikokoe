@@ -64,7 +64,12 @@ export class FacturesService {
       numeroFacture: f.numeroFacture,
       dateFacture: f.dateFacture,
       montant: f.montant,
-      client: f.vente?.commande?.client?.nomClient || 'N/A',
+        client:
+          f.vente?.commande
+            ? f.vente.commande.client
+              ? f.vente.commande.client.nomClient
+              : "Client inconnu"
+            : "Commande non liée",
       statut: 'Payée',
     }));
 
