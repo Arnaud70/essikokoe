@@ -13,6 +13,7 @@ async function bootstrap() {
       'http://localhost',        // Flutter web
       'http://127.0.0.1',        // Variante Flutter web
       'http://localhost:5173',   //  Vite (React/Vue/Svelte)
+      'https://esikokoe-zurx.vercel.app', // Frontend production Vercel
     ],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
