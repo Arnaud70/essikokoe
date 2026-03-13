@@ -14,7 +14,7 @@ import { Roles } from '../decorators/roles.decorator';
 @Controller('auth')
 @ApiBearerAuth()
 export class AuthController {
-  constructor(private authService: AuthService, private usersService: UsersService) {}
+  constructor(private authService: AuthService, private usersService: UsersService) { }
 
   @Post('login')
   @Public()
@@ -36,14 +36,20 @@ export class AuthController {
 
   @Post('register')
   @UseGuards(JwtAuthGuard)
-  @Roles('ADMIN')
+  @Roles('SUPERADMIN')
   @ApiOperation({ summary: 'Create a new admin (Admin only)' })
   @ApiResponse({ status: 201, type: UserResponseDto })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Admin role required' })
   async register(@Body() dto: CreateUserDto) {
     // Only ADMIN can create new admin users
-    const created = await this.usersService.createUser({ nom: dto.nom, email: dto.email, motDePasse: dto.motDePasse, role: 'ADMIN' });
+    const created = await this.usersService.createUser({
+      nom: dto.nom,
+      email: dto.email,
+      motDePasse: dto.motDePasse,
+      role: dto.role || 'SUPERADMIN',
+      magasinId: dto.magasinId
+    });
     // omit motDePasse in response
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { motDePasse, ...rest } = created as any;

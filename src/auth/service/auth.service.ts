@@ -6,7 +6,7 @@ import { jwtConstants } from '../constants';
 
 @Injectable()
 export class AuthService {
-  constructor(private usersService: UsersService, private jwtService: JwtService) {}
+  constructor(private usersService: UsersService, private jwtService: JwtService) { }
 
   async validateUser(email: string, pass: string) {
     const user = await this.usersService.findByEmail(email);
@@ -23,7 +23,7 @@ export class AuthService {
 
   async login(user: any) {
     if (!user) throw new UnauthorizedException();
-    const payload = { sub: user.idUtilisateur, email: user.email, role: user.role };
+    const payload = { sub: user.idUtilisateur, email: user.email, role: user.role, magasinId: user.magasinId };
     const accessToken = this.jwtService.sign(payload, { expiresIn: '1d' });
     const refreshPayload = { ...payload, type: 'refresh' };
     const refreshToken = this.jwtService.sign(refreshPayload, { expiresIn: '7d' });
@@ -31,11 +31,10 @@ export class AuthService {
   }
 
   async refresh(tokenPayload: any) {
-    // tokenPayload should already be validated by strategy/guard
     if (!tokenPayload.type || tokenPayload.type !== 'refresh') {
       throw new UnauthorizedException('Token is not a refresh token');
     }
-    const payload = { sub: tokenPayload.sub, email: tokenPayload.email, role: tokenPayload.role };
+    const payload = { sub: tokenPayload.sub, email: tokenPayload.email, role: tokenPayload.role, magasinId: tokenPayload.magasinId };
     const accessToken = this.jwtService.sign(payload, { expiresIn: '1d' });
     return { accessToken };
   }

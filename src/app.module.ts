@@ -9,6 +9,7 @@ import { ClientsModule } from './modules/clients/clients.module';
 import { FacturesModule } from './modules/factures/factures.module';
 import { ComptabiliteModule } from './modules/comptabilite/comptabilite.module';
 import { RapportsModule } from './modules/rapports/rapports.module';
+import { MagasinsModule } from './modules/magasins/magasins.module';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
@@ -25,6 +26,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
     FacturesModule,
     ComptabiliteModule,
     RapportsModule,
+    MagasinsModule,
   ],
   controllers: [],
   providers: [
@@ -32,4 +34,4 @@ import { RolesGuard } from './auth/guards/roles.guard';
     { provide: APP_GUARD, useClass: RolesGuard },
   ],
 })
-export class AppModule {}
+export class AppModule { }

@@ -9,12 +9,12 @@ export class RapportsService {
     private produitsService: ProduitsService,
     private ventesService: VentesService,
     private prisma: PrismaService,
-  ) {}
+  ) { }
 
-  async getProduitsRapport(dateDebut?: Date, dateFin?: Date) {
+  async getProduitsRapport(user: any, dateDebut?: Date, dateFin?: Date) {
     const ventes = dateDebut && dateFin
       ? (await this.ventesService.getVentesByDateRange(dateDebut, dateFin)).ventes
-      : (await this.ventesService.getAllVentes()).ventes;
+      : (await this.ventesService.getAllVentes(user)).ventes;
 
     const ventesDetails = await Promise.all(
       ventes.map((v) => this.ventesService.getVenteDetail(v.idVente))
@@ -36,7 +36,7 @@ export class RapportsService {
       }
     }
 
-    const allProduits = (await this.produitsService.getAllProduits()).produits || [];
+    const allProduits = (await this.produitsService.getAllProduits(user)).produits || [];
     for (const code in produitsStats) {
       const prod = allProduits.find((p) => p.codeProduit === code);
       if (prod) produitsStats[code].format = prod.format;
@@ -79,48 +79,33 @@ export class RapportsService {
     };
   }
 
-  async generateSalesReport() {
+  async generateSalesReport(user: any) {
     const today = new Date();
     const currentMonth = today.getMonth();
     const currentYear = today.getFullYear();
 
-    const getMonthStart = (month: number, year: number) => {
-      return new Date(year, month, 1);
-    };
-
-    const getMonthEnd = (month: number, year: number) => {
-      return new Date(year, month + 1, 0, 23, 59, 59);
-    };
+    const getMonthStart = (month: number, year: number) => new Date(year, month, 1);
+    const getMonthEnd = (month: number, year: number) => new Date(year, month + 1, 0, 23, 59, 59);
 
     const currentMonthStart = getMonthStart(currentMonth, currentYear);
     const currentMonthEnd = getMonthEnd(currentMonth, currentYear);
 
+    const where: any = {
+      dateVente: { gte: currentMonthStart, lte: currentMonthEnd },
+    };
+    if (user.role !== 'SUPERADMIN') where.magasinId = user.magasinId;
+
     const currentMonthVentes = await this.prisma.vente.findMany({
-      where: {
-        dateVente: {
-          gte: currentMonthStart,
-          lte: currentMonthEnd,
-        },
-      },
+      where,
       include: {
         facture: true,
-        commande: {
-          include: {
-            client: true,
-          },
-        },
+        client: true,
       },
     });
 
-    const currentMonthCA = currentMonthVentes.reduce(
-      (sum, v) => sum + (v.montantTotal || 0),
-      0,
-    );
+    const currentMonthCA = currentMonthVentes.reduce((sum, v) => sum + (v.montantTotal || 0), 0);
     const currentMonthCommandes = currentMonthVentes.length;
-    const currentMonthPanierMoyen =
-      currentMonthCommandes > 0
-        ? Math.round(currentMonthCA / currentMonthCommandes)
-        : 0;
+    const currentMonthPanierMoyen = currentMonthCommandes > 0 ? Math.round(currentMonthCA / currentMonthCommandes) : 0;
 
     let previousMonth = currentMonth - 1;
     let previousYear = currentYear;
@@ -132,61 +117,26 @@ export class RapportsService {
     const previousMonthStart = getMonthStart(previousMonth, previousYear);
     const previousMonthEnd = getMonthEnd(previousMonth, previousYear);
 
+    const prevWhere: any = {
+      dateVente: { gte: previousMonthStart, lte: previousMonthEnd },
+    };
+    if (user.role !== 'SUPERADMIN') prevWhere.magasinId = user.magasinId;
+
     const previousMonthVentes = await this.prisma.vente.findMany({
-      where: {
-        dateVente: {
-          gte: previousMonthStart,
-          lte: previousMonthEnd,
-        },
-      },
+      where: prevWhere,
       include: {
         facture: true,
-        commande: {
-          include: {
-            client: true,
-          },
-        },
+        client: true,
       },
     });
 
-    const previousMonthCA = previousMonthVentes.reduce(
-      (sum, v) => sum + (v.montantTotal || 0),
-      0,
-    );
+    const previousMonthCA = previousMonthVentes.reduce((sum, v) => sum + (v.montantTotal || 0), 0);
     const previousMonthCommandes = previousMonthVentes.length;
-    const previousMonthPanierMoyen =
-      previousMonthCommandes > 0
-        ? Math.round(previousMonthCA / previousMonthCommandes)
-        : 0;
+    const previousMonthPanierMoyen = previousMonthCommandes > 0 ? Math.round(previousMonthCA / previousMonthCommandes) : 0;
 
-    const variationCA =
-      previousMonthCA > 0
-        ? parseFloat(
-            (((currentMonthCA - previousMonthCA) / previousMonthCA) * 100).toFixed(1),
-          )
-        : 0;
-
-    const variationCommandes =
-      previousMonthCommandes > 0
-        ? parseFloat(
-            (
-              ((currentMonthCommandes - previousMonthCommandes) /
-                previousMonthCommandes) *
-              100
-            ).toFixed(1),
-          )
-        : 0;
-
-    const variationPanierMoyen =
-      previousMonthPanierMoyen > 0
-        ? parseFloat(
-            (
-              ((currentMonthPanierMoyen - previousMonthPanierMoyen) /
-                previousMonthPanierMoyen) *
-              100
-            ).toFixed(1),
-          )
-        : 0;
+    const variationCA = previousMonthCA > 0 ? parseFloat((((currentMonthCA - previousMonthCA) / previousMonthCA) * 100).toFixed(1)) : 0;
+    const variationCommandes = previousMonthCommandes > 0 ? parseFloat((((currentMonthCommandes - previousMonthCommandes) / previousMonthCommandes) * 100).toFixed(1)) : 0;
+    const variationPanierMoyen = previousMonthPanierMoyen > 0 ? parseFloat((((currentMonthPanierMoyen - previousMonthPanierMoyen) / previousMonthPanierMoyen) * 100).toFixed(1)) : 0;
 
     const evolution: any[] = [];
     const monthsList = [
@@ -200,47 +150,31 @@ export class RapportsService {
       twoMonthsAgoMonth += 12;
       twoMonthsAgoYear -= 1;
     }
-    monthsList.push({
-      month: twoMonthsAgoMonth,
-      year: twoMonthsAgoYear,
-      isCurrent: false,
-    });
+    monthsList.push({ month: twoMonthsAgoMonth, year: twoMonthsAgoYear, isCurrent: false });
 
     for (const monthData of monthsList) {
       const monthStart = getMonthStart(monthData.month, monthData.year);
       const monthEnd = getMonthEnd(monthData.month, monthData.year);
 
-      const ventes = await this.prisma.vente.findMany({
-        where: {
-          dateVente: {
-            gte: monthStart,
-            lte: monthEnd,
-          },
-        },
-        include: {
-          commande: {
-            include: {
-              client: true,
-            },
-          },
-        },
+      const mWhere: any = {
+        dateVente: { gte: monthStart, lte: monthEnd },
+      };
+      if (user.role !== 'SUPERADMIN') mWhere.magasinId = user.magasinId;
+
+      const vts = await this.prisma.vente.findMany({
+        where: mWhere,
+        include: { client: true },
       });
 
-      const ca = ventes.reduce((sum, v) => sum + (v.montantTotal || 0), 0);
-      const clients = new Set(
-        ventes.map((v) => v.commande?.client?.idClient).filter(Boolean),
-      ).size;
-
-      const monthName = new Date(monthData.year, monthData.month, 1).toLocaleString(
-        'fr-FR',
-        { month: 'long', year: 'numeric' },
-      );
+      const ca = vts.reduce((sum, v) => sum + (v.montantTotal || 0), 0);
+      const cls = new Set(vts.map((v) => v.client?.idClient).filter(Boolean)).size;
+      const monthName = new Date(monthData.year, monthData.month, 1).toLocaleString('fr-FR', { month: 'long', year: 'numeric' });
 
       evolution.push({
         mois: monthName.charAt(0).toUpperCase() + monthName.slice(1),
         chiffreAffaires: ca,
-        nombreCommandes: ventes.length,
-        nombreClients: clients,
+        nombreCommandes: vts.length,
+        nombreClients: cls,
         isCurrent: monthData.isCurrent,
       });
     }

@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateStockEntryDto } from '../dtos/create-stock-entry.dto';
 import { DeductStockDto } from '../dtos/deduct-stock.dto';
+import { TransferStockDto } from '../dtos/transfer-stock.dto';
 import {
   StockInventoryResponseDto,
   StockInventoryDto,
@@ -10,370 +11,325 @@ import {
   StockByFormatResponseDto,
   StockByFormatDto,
 } from '../dtos/stock-by-format.dto';
-import {
-  StockMovementResponseDto,
-  StockMovementDto,
-} from '../dtos/stock-movement.dto';
+import { StockMovementType } from '@prisma/client';
 
 @Injectable()
 export class StockService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
-  /**
-   * 🔧 HELPER: Calculer le stock réel à partir des mouvements
-   * Stock réel = stockInitial + (somme des ENTREES) - (somme des SORTIES)
-   */
-  private async calculateRealStock(codeProduit: string): Promise<number> {
-    const produit = await this.prisma.produit.findUnique({
-      where: { codeProduit },
+  private async getDepotCentralId(): Promise<string> {
+    const depot = await (this.prisma as any).magasin.findFirst({
+      where: { nomMagasin: 'Dépôt Central' },
     });
-
-    if (!produit) {
-      throw new NotFoundException(
-        `Produit avec code ${codeProduit} non trouvé`,
-      );
+    if (!depot) {
+      // Si le dépôt n'existe pas encore (premier lancement), on en crée un
+      const newDepot = await (this.prisma as any).magasin.create({
+        data: { nomMagasin: 'Dépôt Central', emplacement: 'Lomé' }
+      });
+      return newDepot.idMagasin;
     }
-
-    const mouvements = await this.prisma.stockMovement.findMany({
-      where: { codeProduit },
-    });
-
-    let stockReel = produit.stockInitial;
-    mouvements.forEach((m) => {
-      if (m.type === 'ENTREE') {
-        stockReel += m.quantite;
-      } else if (m.type === 'SORTIE') {
-        stockReel -= m.quantite;
-      }
-    });
-
-    return Math.max(0, stockReel); // Le stock ne peut pas être négatif
+    return depot.idMagasin;
   }
 
   /**
-   * 📥 ENREGISTREMENT D'ENTRÉE DE STOCK
-   * Ajoute des unités au stock d'un produit (livraison, retour, etc.)
-   * Crée un mouvement tracé dans StockMovement
+   * 📥 ENREGISTREMENT D'ENTRÉE DE STOCK (AJOUT INITIAL)
    */
-  async registerStockEntry(dto: CreateStockEntryDto, username: string): Promise<{
-    message: string;
-    codeProduit: string;
-    quantiteAjoutee: number;
-    nouveauStock: number;
-  }> {
-    // Vérifier que le produit existe
+  async registerStockEntry(dto: CreateStockEntryDto, user: any): Promise<any> {
+    const magasinId = user.role === 'SUPERADMIN' ? (dto as any).magasinId : user.magasinId;
+    if (!magasinId) throw new BadRequestException('ID du magasin requis');
+
     const produit = await this.prisma.produit.findUnique({
       where: { codeProduit: dto.codeProduit },
     });
 
-    if (!produit) {
-      throw new NotFoundException(
-        `Produit avec code ${dto.codeProduit} non trouvé`,
-      );
-    }
+    if (!produit) throw new NotFoundException(`Produit ${dto.codeProduit} non trouvé`);
 
-    // Vérifier que le format correspond
-    if (produit.format !== dto.format) {
-      throw new BadRequestException(
-        `Format fourni (${dto.format}) ne correspond pas au produit (${produit.format})`,
-      );
-    }
+    const result = await this.prisma.$transaction(async (tx) => {
+      const stock = await (tx as any).stock.upsert({
+        where: { produitId_magasinId: { produitId: dto.codeProduit, magasinId } },
+        update: { quantite: { increment: dto.quantite } },
+        create: { produitId: dto.codeProduit, magasinId, quantite: dto.quantite },
+      });
 
-    // 🔴 NOUVEAU: Créer le mouvement de stock
-    const mouvement = await this.prisma.stockMovement.create({
-      data: {
-        codeProduit: dto.codeProduit,
-        type: 'ENTREE',
-        quantite: dto.quantite,
-        motif: dto.motif,
-        createdBy: username,
-      },
+      await (tx as any).stockMovement.create({
+        data: {
+          codeProduit: dto.codeProduit,
+          type: StockMovementType.ENTREE,
+          quantite: dto.quantite,
+          magasinId: magasinId,
+          motif: dto.motif,
+          createdBy: user.email,
+        },
+      });
+
+      return stock;
     });
-
-    // Calculer le nouveau stock réel
-    const nouveauStock = await this.calculateRealStock(dto.codeProduit);
 
     return {
       message: 'Entrée de stock enregistrée avec succès',
       codeProduit: dto.codeProduit,
       quantiteAjoutee: dto.quantite,
-      nouveauStock,
+      nouveauStock: result.quantite,
     };
   }
 
   /**
-   * 📤 DÉDUCTION AUTOMATIQUE APRÈS VENTE
-   * Réduit le stock dès qu'une vente est confirmée
-   * Crée un mouvement SORTIE tracé dans StockMovement
+   * 🔄 TRANSFERT DE STOCK (DISTRIBUTION ENTRE MAGASINS)
+   * Réservé au SUPERADMIN
    */
-  async deductStockAfterSale(dto: DeductStockDto, username: string): Promise<{
-    message: string;
-    codeProduit: string;
-    quantiteDeduite: number;
-    nouveauStock: number;
-    estCritique: boolean;
-  }> {
-    const produit = await this.prisma.produit.findUnique({
-      where: { codeProduit: dto.codeProduit },
+  async transferStock(dto: TransferStockDto, user: any): Promise<any> {
+    const { codeProduit, quantite, destinationMagasinId, motif } = dto;
+    let { sourceMagasinId } = dto;
+
+    if (!sourceMagasinId) {
+      sourceMagasinId = await this.getDepotCentralId();
+    }
+
+    if (sourceMagasinId === destinationMagasinId) {
+      throw new BadRequestException('Le magasin source et destination doivent être différents');
+    }
+
+    // 1. Vérifier le stock source
+    const sourceStock = await (this.prisma as any).stock.findUnique({
+      where: { produitId_magasinId: { produitId: codeProduit, magasinId: sourceMagasinId } },
     });
 
-    if (!produit) {
-      throw new NotFoundException(
-        `Produit avec code ${dto.codeProduit} non trouvé`,
-      );
+    if (!sourceStock || sourceStock.quantite < quantite) {
+      throw new BadRequestException('Stock source insuffisant pour le transfert');
     }
 
-    // Vérifier qu'il y a assez de stock
-    const stockActuel = await this.calculateRealStock(dto.codeProduit);
-    if (stockActuel < dto.quantite) {
-      throw new BadRequestException(
-        `Stock insuffisant. Disponible: ${stockActuel}, Demandé: ${dto.quantite}`,
-      );
+    // 2. Exécuter le transfert atomique
+    return await this.prisma.$transaction(async (tx) => {
+      // Déduire du magasin source
+      const updatedSource = await (tx as any).stock.update({
+        where: { idStock: sourceStock.idStock },
+        data: { quantite: { decrement: quantite } },
+      });
+
+      // Ajouter au magasin destination (ou créer si n'existe pas)
+      const updatedDest = await (tx as any).stock.upsert({
+        where: { produitId_magasinId: { produitId: codeProduit, magasinId: destinationMagasinId } },
+        update: { quantite: { increment: quantite } },
+        create: { produitId: codeProduit, magasinId: destinationMagasinId, quantite },
+      });
+
+      // Tracer le transfert
+      const transfer = await (tx as any).stockTransfer.create({
+        data: {
+          produitId: codeProduit,
+          sourceMagasinId,
+          destinationMagasinId,
+          quantite,
+          motif: motif || 'Distribution de stock',
+          userId: user.id || user.sub || user.idUtilisateur,
+        },
+      });
+
+      // Enregistrer les mouvements de stock détaillés
+      await (tx as any).stockMovement.createMany({
+        data: [
+          {
+            codeProduit,
+            type: StockMovementType.SORTIE,
+            quantite,
+            magasinId: sourceMagasinId,
+            motif: `Transfert vers magasin ${destinationMagasinId}`,
+            createdBy: user.email,
+          },
+          {
+            codeProduit,
+            type: StockMovementType.ENTREE,
+            quantite,
+            magasinId: destinationMagasinId,
+            motif: `Réception de magasin ${sourceMagasinId}`,
+            createdBy: user.email,
+          },
+        ],
+      });
+
+      return {
+        message: 'Transfert effectué avec succès',
+        transferId: transfer.id,
+        stockSource: updatedSource.quantite,
+        stockDestination: updatedDest.quantite,
+      };
+    });
+  }
+
+  /**
+   * 📜 HISTORIQUE DES TRANSFERTS
+   */
+  async getTransferHistory(user: any): Promise<any> {
+    const where: any = {};
+    if (user.role !== 'SUPERADMIN') {
+      where.OR = [
+        { sourceMagasinId: user.magasinId },
+        { destinationMagasinId: user.magasinId },
+      ];
     }
 
-    // 🔴 NOUVEAU: Créer le mouvement de sortie
-    await this.prisma.stockMovement.create({
-      data: {
-        codeProduit: dto.codeProduit,
-        type: 'SORTIE',
-        quantite: dto.quantite,
-        motif: 'Vente',
-        createdBy: username,
+    return (this.prisma as any).stockTransfer.findMany({
+      where,
+      include: {
+        produit: true,
+        sourceMagasin: true,
+        destinationMagasin: true,
       },
+      orderBy: { date: 'desc' },
+    });
+  }
+
+  /**
+   * 📤 DÉDUCTION DE STOCK (VENTE)
+   */
+  async deductStock(dto: DeductStockDto, user: any): Promise<any> {
+    const magasinId = user.role === 'SUPERADMIN' ? (dto as any).magasinId : user.magasinId;
+    if (!magasinId) throw new BadRequestException('ID du magasin requis');
+
+    const stock = await (this.prisma as any).stock.findUnique({
+      where: { produitId_magasinId: { produitId: dto.codeProduit, magasinId } },
     });
 
-    // Calculer le nouveau stock réel
-    const nouveauStock = await this.calculateRealStock(dto.codeProduit);
-
-    // Vérifier si le stock est critique après déduction
-    const estCritique = nouveauStock <= produit.stockMinimum;
-
-    // Si critique, créer une notification
-    if (estCritique) {
-      await this.createStockAlertNotification(produit, nouveauStock);
+    if (!stock || stock.quantite < dto.quantite) {
+      throw new BadRequestException('Stock insuffisant');
     }
 
+    const result = await this.prisma.$transaction(async (tx) => {
+      const updatedStock = await (tx as any).stock.update({
+        where: { idStock: stock.idStock },
+        data: { quantite: { decrement: dto.quantite } },
+      });
+
+      await (tx as any).stockMovement.create({
+        data: {
+          codeProduit: dto.codeProduit,
+          type: StockMovementType.SORTIE,
+          quantite: dto.quantite,
+          magasinId: magasinId,
+          motif: 'Vente',
+          createdBy: user.email,
+        },
+      });
+
+      return updatedStock;
+    });
+
     return {
-      message: 'Déduction de stock effectuée',
+      message: 'Stock déduit avec succès',
       codeProduit: dto.codeProduit,
-      quantiteDeduite: dto.quantite,
-      nouveauStock,
-      estCritique,
+      nouveauStock: result.quantite,
     };
   }
 
   /**
-   * 👁️ CONSULTATION DE L'INVENTAIRE
-   * Retourne l'état complet du stock avec alertes visuelles
-   * Stock calculé à partir des mouvements
+   * 👁️ CONSULTATION DE L'INVENTAIRE (FILTRÉ PAR MAGASIN)
    */
-  async getInventory(): Promise<StockInventoryResponseDto> {
-    const produits = await this.prisma.produit.findMany();
+  async getInventory(user: any): Promise<StockInventoryResponseDto> {
+    const where: any = {};
+    if (user.role !== 'SUPERADMIN' && user.magasinId) {
+      where.magasinId = user.magasinId;
+    }
 
-    const inventaire: StockInventoryDto[] = await Promise.all(
-      produits.map(async (p) => {
-        const stockActuel = await this.calculateRealStock(p.codeProduit);
-        const estCritique = stockActuel <= p.stockMinimum;
-        const pourcentageDisponibilité =
-          stockActuel > 0
-            ? Math.round((stockActuel / (stockActuel + p.stockMinimum)) * 100)
-            : 0;
+    const stocks = await (this.prisma as any).stock.findMany({
+      where,
+      include: { produit: true },
+    });
 
-        return {
-          codeProduit: p.codeProduit,
-          nomProduit: p.nomProduit,
-          format: p.format,
-          stockActuel,
-          stockMinimum: p.stockMinimum,
-          prixUnitaire: p.prixUnitaire,
-          estCritique,
-          pourcentageDisponibilité,
-        };
-      }),
-    );
-
-    const produitsEnAlerte = inventaire.filter((inv) => inv.estCritique).length;
-    const stockTotal = inventaire.reduce((acc, inv) => acc + inv.stockActuel, 0);
+    const inventaire: StockInventoryDto[] = stocks.map((s) => ({
+      codeProduit: s.produitId,
+      nomProduit: s.produit.nomProduit,
+      format: s.produit.format,
+      stockActuel: s.quantite,
+      stockMinimum: (s.produit as any).stockMinimum || 0,
+      prixUnitaire: s.produit.prixUnitaire,
+      estCritique: s.quantite <= ((s.produit as any).stockMinimum || 0),
+      pourcentageDisponibilité: 100,
+    }));
 
     return {
-      totalProduits: produits.length,
-      stockTotal,
-      produitsEnAlerte,
+      totalProduits: inventaire.length,
+      stockTotal: inventaire.reduce((acc, inv) => acc + inv.stockActuel, 0),
+      produitsEnAlerte: inventaire.filter((inv) => inv.estCritique).length,
       inventaire,
     };
   }
 
   /**
-   * 📊 SUIVI PAR TYPE DE PRODUIT (SACHET / BOUTEILLE / BONBONNE)
-   * Stock calculé à partir des mouvements
+   * 📊 STOCK PAR FORMAT
    */
-  async getStockByFormat(): Promise<StockByFormatResponseDto> {
-    const produits = await this.prisma.produit.findMany();
-
+  async getStockByFormat(user: any): Promise<StockByFormatResponseDto> {
+    const inventory = await this.getInventory(user);
     const mapFormat = new Map<string, StockByFormatDto>();
 
-    for (const p of produits) {
-      const stockActuel = await this.calculateRealStock(p.codeProduit);
-      const format = p.format;
-      const existing = mapFormat.get(format) || {
-        format,
+    for (const item of inventory.inventaire) {
+      const existing = mapFormat.get(item.format) || {
+        format: item.format,
         quantite: 0,
         nombreProduits: 0,
         valeurTotale: 0,
       };
 
-      existing.quantite += stockActuel;
+      existing.quantite += item.stockActuel;
       existing.nombreProduits += 1;
-      existing.valeurTotale += stockActuel * p.prixUnitaire;
+      existing.valeurTotale += item.stockActuel * item.prixUnitaire;
 
-      mapFormat.set(format, existing);
+      mapFormat.set(item.format, existing);
     }
 
     const parFormat = Array.from(mapFormat.values());
-    const totalUnites = parFormat.reduce((acc, f) => acc + f.quantite, 0);
-    const valeurTotalStock = parFormat.reduce(
-      (acc, f) => acc + f.valeurTotale,
-      0,
-    );
-
     return {
       parFormat,
-      totalUnites,
-      valeurTotalStock,
+      totalUnites: parFormat.reduce((acc, f) => acc + f.quantite, 0),
+      valeurTotalStock: parFormat.reduce((acc, f) => acc + f.valeurTotale, 0),
     };
   }
 
-  /**
-   * 🔔 DÉTECTION DE SEUILS CRITIQUES
-   * Retourne les produits avec stock <= stockMinimum
-   */
-  async getCriticalStocks(): Promise<{
-    produitsEnAlerte: StockInventoryDto[];
-    nombreAlertes: number;
-  }> {
-    const inventory = await this.getInventory();
-    const produitsEnAlerte = inventory.inventaire.filter(
-      (inv) => inv.estCritique,
-    );
+  async getCriticalStocks(user: any): Promise<any> {
+    const inventory = await this.getInventory(user);
+    const produitsEnAlerte = inventory.inventaire.filter((inv) => inv.estCritique);
+    return { produitsEnAlerte, nombreAlertes: produitsEnAlerte.length };
+  }
+
+  async getStockDashboardMetrics(user: any): Promise<any> {
+    const inventory = await this.getInventory(user);
+    const distribution = {};
+    inventory.inventaire.forEach(inv => {
+      distribution[inv.format] = (distribution[inv.format] || 0) + inv.stockActuel;
+    });
 
     return {
-      produitsEnAlerte,
-      nombreAlertes: produitsEnAlerte.length,
+      stockTotal: inventory.stockTotal,
+      valeurTotalStock: inventory.inventaire.reduce((acc, inv) => acc + (inv.stockActuel * inv.prixUnitaire), 0),
+      produitsEnAlerte: inventory.produitsEnAlerte,
+      distribuitionParFormat: distribution,
+      tauxCouverture: inventory.totalProduits > 0 ? Math.round(((inventory.totalProduits - inventory.produitsEnAlerte) / inventory.totalProduits) * 100) : 0,
     };
   }
 
-  /**
-   * 🔔 CRÉER UNE NOTIFICATION AUTOMATIQUE
-   */
-  private async createStockAlertNotification(
-    produit: any,
-    stockActuel: number,
-  ): Promise<void> {
-    await this.prisma.notification.create({
-      data: {
-        type: 'STOCK_FAIBLE',
-        message: `⚠️ Stock critique pour ${produit.nomProduit} (Code: ${produit.codeProduit}). Stock actuel: ${stockActuel}, Minimum: ${produit.stockMinimum}`,
-        produitId: produit.codeProduit,
-      },
-    });
-  }
-
-  /**
-   * 📈 ANALYTICS POUR DASHBOARD
-   * Utilise le stock réel calculé à partir des mouvements
-   */
-  async getStockDashboardMetrics(): Promise<{
-    stockTotal: number;
-    valeurTotalStock: number;
-    produitsEnAlerte: number;
-    distribuitionParFormat: Record<string, number>;
-    tauxCouverture: number; // % de produits > stockMinimum
-  }> {
-    const produits = await this.prisma.produit.findMany();
-
-    let stockTotal = 0;
-    let valeurTotalStock = 0;
-    let produitsEnAlerte = 0;
-    const distribuitionParFormat = {};
-
-    for (const p of produits) {
-      const stockActuel = await this.calculateRealStock(p.codeProduit);
-      stockTotal += stockActuel;
-      valeurTotalStock += stockActuel * p.prixUnitaire;
-
-      if (stockActuel <= p.stockMinimum) {
-        produitsEnAlerte++;
-      }
-
-      distribuitionParFormat[p.format] =
-        (distribuitionParFormat[p.format] || 0) + stockActuel;
+  async getStockMovementHistory(user: any, limit: number = 100): Promise<any> {
+    const where: any = {};
+    if (user.role !== 'SUPERADMIN' && user.magasinId) {
+      where.magasinId = user.magasinId;
     }
 
-    const tauxCouverture =
-      produits.length > 0
-        ? Math.round(
-            ((produits.length - produitsEnAlerte) / produits.length) * 100,
-          )
-        : 0;
-
-    return {
-      stockTotal,
-      valeurTotalStock,
-      produitsEnAlerte,
-      distribuitionParFormat,
-      tauxCouverture,
-    };
-  }
-
-  /**
-   *  HISTORIQUE DES MOUVEMENTS DE STOCK
-   */
-  async getStockMovementHistory(limit: number = 100): Promise<any> {
-    // Convertir en entier et borner entre 1 et 1000
-    const limitInt = Math.max(1, Math.min(parseInt(String(limit), 10) || 100, 1000));
-
-    const mouvements = await this.prisma.stockMovement.findMany({
-      include: {
-        produit: {
-          select: {
-            codeProduit: true,
-            nomProduit: true,
-            format: true,
-          },
-        },
-      },
+    const mouvements = await (this.prisma as any).stockMovement.findMany({
+      where,
+      include: { produit: true },
       orderBy: { createdAt: 'desc' },
-      take: limitInt,
+      take: limit,
     });
 
-    const historique = mouvements.map((m) => ({
-      id: m.id,
-      date: m.createdAt,
-      produit: `${m.produit.nomProduit} - ${this.getFormatLabel(m.produit.format)}`,
-      codeProduit: m.codeProduit,
-      type: m.type === 'ENTREE' ? '+' : '-',
-      typeLabel: m.type,
-      quantite: m.quantite,
-      motif: m.motif,
-      reference: m.id.substring(0, 8).toUpperCase(), // Simuler une référence
-      utilisateur: m.createdBy || 'System',
-    }));
-
     return {
-      total: historique.length,
-      mouvements: historique,
+      total: mouvements.length,
+      mouvements: mouvements.map(m => ({
+        id: m.id,
+        date: m.createdAt,
+        produit: m.produit.nomProduit,
+        type: m.type === 'ENTREE' ? '+' : '-',
+        quantite: m.quantite,
+        motif: m.motif,
+        utilisateur: m.createdBy,
+      })),
     };
-  }
-
-  /**
-   * 🔧 HELPER: Obtenir le label du format
-   */
-  private getFormatLabel(format: string): string {
-    const labels = {
-      SACHET: 'Sachet',
-      BOUTEILLE: 'Bouteille 1.5L',
-      BONBONNE: 'Bonbonne',
-    };
-    return labels[format] || format;
   }
 }

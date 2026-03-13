@@ -61,11 +61,15 @@ export class CreateVenteDto {
   @Type(() => CreateLigneVenteDto)
   produits: CreateLigneVenteDto[];
 
-  @ApiProperty({
-    description: 'Mode de paiement',
-    enum: ['Espèces', 'Mobile Money', 'Chèque', 'Carte bancaire'],
-    example: 'Espèces',
-  })
   @IsString()
   modePaiement: string;
+
+  @ApiProperty({
+    description: 'ID du magasin (pour Superadmin)',
+    example: 'uuid-magasin',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  magasinId?: string;
 }

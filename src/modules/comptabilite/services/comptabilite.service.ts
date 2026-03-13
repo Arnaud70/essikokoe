@@ -6,10 +6,10 @@ import { CreateBilanDto } from '../dtos/create-bilan.dto';
 
 @Injectable()
 export class ComptabiliteService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   // ===== TRANSACTIONS =====
-  
+
   async createTransaction(dto: CreateTransactionDto) {
     let venteIdToUse = dto.venteId;
     // Si une référence facture est fournie, utiliser la vente liée à la facture
@@ -43,9 +43,8 @@ export class ComptabiliteService {
 
   async getTransactions(type?: string) {
     const where: any = {};
-    // Valider que le type est un enum valide (RECETTE ou DEPENSE)
     if (type && ['RECETTE', 'DEPENSE'].includes(type.toUpperCase())) {
-      where.typeTransaction = type.toUpperCase();
+      where.typeTransaction = type.toUpperCase() as any;
     }
 
     const transactions = await this.prisma.transaction.findMany({
@@ -71,7 +70,7 @@ export class ComptabiliteService {
   async getDistributionByCategory() {
     const transactions = await this.prisma.transaction.findMany();
 
-    const distribution = {
+    const distribution: any = {
       recettes: {},
       depenses: {},
     };
@@ -84,7 +83,6 @@ export class ComptabiliteService {
       distribution[type][t.categorie] += t.montant;
     });
 
-    // Convertir en array pour affichage
     return {
       recettes: Object.entries(distribution.recettes).map(([categorie, montant]) => ({
         categorie,
@@ -98,7 +96,7 @@ export class ComptabiliteService {
   }
 
   // RAPPORTS 
-  
+
   async getRapports() {
     return this.prisma.rapport.findMany({
       orderBy: { createdAt: 'desc' }
@@ -110,7 +108,7 @@ export class ComptabiliteService {
       data: {
         typeRapport: dto.typeRapport,
         periode: dto.periode,
-        donneesStatistiques: dto.donneesStatistiques,
+        donneesStatistiques: dto.donneesStatistiques as any,
       },
     });
 
@@ -118,7 +116,7 @@ export class ComptabiliteService {
   }
 
   // ===== BILAN =====
-  
+
   async getBilans() {
     return this.prisma.bilan.findMany({
       orderBy: { exercice: 'desc' }
@@ -143,21 +141,20 @@ export class ComptabiliteService {
   }
 
   async getBilanSummary() {
-    // Récupérer les transactions
     const transactions = await this.prisma.transaction.findMany();
-    
-    // Récupérer le stock total
-    const stock = await this.prisma.produit.findMany();
-    const totalStock = stock.reduce((acc, p) => {
-      // Calculer le stock actuel basé sur les mouvements
-      return acc + (p.stockInitial * p.prixUnitaire);
+
+    // Use Stock table instead of stockInitial
+    const stocks = await this.prisma.stock.findMany({
+      include: { produit: true }
+    });
+
+    const totalStock = stocks.reduce((acc, s) => {
+      return acc + (s.quantite * s.produit.prixUnitaire);
     }, 0);
 
-    // Calculer les actifs
     let tresorerie = 0;
     let creancesClients = 0;
 
-    // Calculer basé sur les recettes/dépenses
     transactions.forEach((t) => {
       if (t.typeTransaction === 'RECETTE' && t.categorie === 'Ventes') {
         tresorerie += t.montant;
@@ -171,10 +168,9 @@ export class ComptabiliteService {
 
     const totalActifs = Math.max(0, tresorerie) + totalStock + creancesClients;
 
-    // Calculer les passifs
     let dettesFournisseurs = 0;
     let chargesAPayer = 0;
-    let capital = 2000000; // Valeur par défaut
+    let capital = 2000000;
 
     transactions.forEach((t) => {
       if (t.typeTransaction === 'DEPENSE') {
@@ -206,7 +202,7 @@ export class ComptabiliteService {
   }
 
   // ===== AUDIT =====
-  
+
   async getAudit() {
     return this.prisma.auditLog.findMany({
       orderBy: { createdAt: 'desc' },
@@ -221,9 +217,8 @@ export class ComptabiliteService {
     const transactionsVerifiees = transactions.length;
     const detailsEcarts: any[] = [];
 
-    // Vérifier si le bilan est équilibré
     const difference = bilanData.actifs.totalActifs - bilanData.passifs.totalPassifs;
-    
+
     if (Math.abs(difference) > 0.01) {
       detailsEcarts.push({
         description: 'Déséquilibre du bilan',
@@ -244,7 +239,6 @@ export class ComptabiliteService {
 
   async verifyEquilibration() {
     const bilanData = await this.getBilanSummary();
-
     const totalActifs = bilanData.actifs.totalActifs;
     const totalPassifs = bilanData.passifs.totalPassifs;
     const difference = totalActifs - totalPassifs;
@@ -262,7 +256,6 @@ export class ComptabiliteService {
       orderBy: { createdAt: 'desc' },
     });
 
-    // Calculer les totaux actuels
     let totalRecettes = 0;
     let totalDepenses = 0;
 
@@ -276,7 +269,6 @@ export class ComptabiliteService {
 
     const resultatNet = totalRecettes - totalDepenses;
 
-    // Analyser les tendances (basé sur les 30 derniers jours)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -295,9 +287,7 @@ export class ComptabiliteService {
       }
     });
 
-    const tauxCroissance =
-      totalRecettes > 0 ? ((recettesRecentes - totalRecettes) / totalRecettes) * 100 : 0;
-
+    const tauxCroissance = totalRecettes > 0 ? ((recettesRecentes - totalRecettes) / totalRecettes) * 100 : 0;
     let tendance: 'Hausse' | 'Baisse' | 'Stable' = 'Stable';
     if (tauxCroissance > 5) tendance = 'Hausse';
     if (tauxCroissance < -5) tendance = 'Baisse';
@@ -328,33 +318,13 @@ export class ComptabiliteService {
     };
   }
 
-  private generateRecommandations(
-    auditStatus: any,
-    equilibration: any,
-    trends: any
-  ): string[] {
+  private generateRecommandations(auditStatus: any, equilibration: any, trends: any): string[] {
     const recommandations: string[] = [];
-
-    if (!equilibration.equilibre) {
-      recommandations.push('Vérifier le déséquilibre du bilan détecté');
-    }
-
-    if (auditStatus.ecartsDetectes > 0) {
-      recommandations.push('Analyser les écarts détectés et prendre des mesures correctives');
-    }
-
-    if (trends.tendance === 'Baisse') {
-      recommandations.push('Analyser la baisse des recettes et prendre des mesures appropriées');
-    }
-
-    if (trends.totalDepenses > trends.totalRecettes * 0.8) {
-      recommandations.push('Les dépenses approchent les recettes, contrôler les dépenses');
-    }
-
-    if (recommandations.length === 0) {
-      recommandations.push('Situation financière saine, continuez le suivi régulier');
-    }
-
+    if (!equilibration.equilibre) recommandations.push('Vérifier le déséquilibre du bilan détecté');
+    if (auditStatus.ecartsDetectes > 0) recommandations.push('Analyser les écarts détectés et prendre des mesures correctives');
+    if (trends.tendance === 'Baisse') recommandations.push('Analyser la baisse des recettes et prendre des mesures appropriées');
+    if (trends.totalDepenses > trends.totalRecettes * 0.8) recommandations.push('Les dépenses approchent les recettes, contrôler les dépenses');
+    if (recommandations.length === 0) recommandations.push('Situation financière saine, continuez le suivi régulier');
     return recommandations;
   }
 }

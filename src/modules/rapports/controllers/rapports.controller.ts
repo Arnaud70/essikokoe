@@ -1,26 +1,33 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, UseGuards, Query, Request } from '@nestjs/common';
 import { JwtAuthGuard } from '../../../auth/guards/jwt-auth.guard';
 import { Roles } from '../../../auth/decorators/roles.decorator';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { RapportsService } from '../services/rapports.service';
 import { SalesReportDto } from '../dtos/sales-metrics.dto';
+import { Public } from '../../../auth/decorators/public.decorator';
 
 @ApiTags('rapports')
 @Controller('rapports')
 @ApiBearerAuth()
 export class RapportsController {
-  constructor(private readonly rapportsService: RapportsService) {}
+  constructor(private readonly rapportsService: RapportsService) { }
 
   @UseGuards(JwtAuthGuard)
-  @Roles('ADMIN', 'UTILISATEUR')
+  @Roles('SUPERADMIN', 'GERANT')
   @Get('produits')
   @ApiOperation({ summary: 'Rapport produits - Classement par ventes' })
-  async getProduitsRapport() {
-    return this.rapportsService.getProduitsRapport();
+  async getProduitsRapport(
+    @Request() req: any,
+    @Query('debut') debut?: string,
+    @Query('fin') fin?: string,
+  ) {
+    const debutDate = debut ? new Date(debut) : undefined;
+    const finDate = fin ? new Date(fin) : undefined;
+    return this.rapportsService.getProduitsRapport(req.user, debutDate, finDate);
   }
 
   @UseGuards(JwtAuthGuard)
-  @Roles('ADMIN')
+  @Roles('SUPERADMIN', 'GERANT')
   @Get('ventes')
   @ApiOperation({
     summary: 'Rapport de ventes',
@@ -40,7 +47,7 @@ export class RapportsController {
     status: 403,
     description: 'Accès refusé - Admin requis',
   })
-  async getSalesReport() {
-    return await this.rapportsService.generateSalesReport();
+  async getSalesReport(@Request() req: any) {
+    return await this.rapportsService.generateSalesReport(req.user);
   }
 }

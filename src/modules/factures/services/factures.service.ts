@@ -4,25 +4,21 @@ import { UpdateFactureDto } from '../dtos/facture.dto';
 
 @Injectable()
 export class FacturesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
-  
-   //RÉCUPÉRER UNE FACTURE PAR ID
-   
+  /**
+   * 📖 RÉCUPÉRER UNE FACTURE PAR ID
+   */
   async getFactureById(idFacture: string): Promise<any> {
     const facture = await this.prisma.facture.findUnique({
       where: { idFacture },
       include: {
         vente: {
           include: {
-            commande: {
+            client: true,
+            lignes: {
               include: {
-                client: true,
-                lignes: {
-                  include: {
-                    produit: true,
-                  },
-                },
+                produit: true,
               },
             },
           },
@@ -37,9 +33,9 @@ export class FacturesService {
     return facture;
   }
 
-  
-    //LISTER TOUTES LES FACTURES
-   
+  /**
+   * 📋 LISTER TOUTES LES FACTURES
+   */
   async getAllFactures(): Promise<{
     total: number;
     factures: any[];
@@ -48,11 +44,7 @@ export class FacturesService {
       include: {
         vente: {
           include: {
-            commande: {
-              include: {
-                client: true,
-              },
-            },
+            client: true,
           },
         },
       },
@@ -64,12 +56,7 @@ export class FacturesService {
       numeroFacture: f.numeroFacture,
       dateFacture: f.dateFacture,
       montant: f.montant,
-        client:
-          f.vente?.commande
-            ? f.vente.commande.client
-              ? f.vente.commande.client.nomClient
-              : "Client inconnu"
-            : "Commande non liée",
+      client: f.vente?.client?.nomClient || "Client inconnu",
       statut: 'Payée',
     }));
 
@@ -79,9 +66,9 @@ export class FacturesService {
     };
   }
 
-  
-    //RECHERCHER DES FACTURES
-   
+  /**
+   * 🔍 RECHERCHER DES FACTURES
+   */
   async searchFactures(query: string): Promise<{
     total: number;
     factures: any[];
@@ -92,9 +79,7 @@ export class FacturesService {
           { numeroFacture: { contains: query, mode: 'insensitive' } },
           {
             vente: {
-              commande: {
-                client: { nomClient: { contains: query, mode: 'insensitive' } },
-              },
+              client: { nomClient: { contains: query, mode: 'insensitive' } },
             },
           },
         ],
@@ -102,11 +87,7 @@ export class FacturesService {
       include: {
         vente: {
           include: {
-            commande: {
-              include: {
-                client: true,
-              },
-            },
+            client: true,
           },
         },
       },
@@ -118,7 +99,7 @@ export class FacturesService {
       numeroFacture: f.numeroFacture,
       dateFacture: f.dateFacture,
       montant: f.montant,
-      client: f.vente?.commande?.client?.nomClient || 'N/A',
+      client: f.vente?.client?.nomClient || 'N/A',
       statut: 'Payée',
     }));
 
@@ -128,9 +109,9 @@ export class FacturesService {
     };
   }
 
-  
-   //FILTRER PAR DATE
-   
+  /**
+   * 📅 FILTRER PAR DATE
+   */
   async getFacturesByDateRange(
     dateDebut: Date,
     dateFin: Date,
@@ -148,11 +129,7 @@ export class FacturesService {
       include: {
         vente: {
           include: {
-            commande: {
-              include: {
-                client: true,
-              },
-            },
+            client: true,
           },
         },
       },
@@ -164,7 +141,7 @@ export class FacturesService {
       numeroFacture: f.numeroFacture,
       dateFacture: f.dateFacture,
       montant: f.montant,
-      client: f.vente?.commande?.client?.nomClient || 'N/A',
+      client: f.vente?.client?.nomClient || 'N/A',
       statut: 'Payée',
     }));
 
@@ -174,8 +151,9 @@ export class FacturesService {
     };
   }
 
-  
-   // METTRE À JOUR UNE FACTURE
+  /**
+   * ✏️ METTRE À JOUR UNE FACTURE
+   */
   async updateFacture(
     idFacture: string,
     dto: UpdateFactureDto,
@@ -197,9 +175,9 @@ export class FacturesService {
     };
   }
 
-  
-    //STATISTIQUES FACTURES
-   
+  /**
+   * 📊 STATISTIQUES FACTURES
+   */
   async getFacturesStats(): Promise<any> {
     const factures = await this.prisma.facture.findMany();
 

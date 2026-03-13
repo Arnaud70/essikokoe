@@ -9,9 +9,11 @@ datasource db {
 }
 
 enum Role {
-  ADMIN
-  AGENT
-  CLIENT
+  SUPERADMIN
+  GERANT
+  MAGASINIER
+  VENDEUR
+  RESPONSABLE_ACHAT
 }
 
 enum Format {
@@ -20,10 +22,17 @@ enum Format {
   BONBONNE
 }
 
+enum ProduitType {
+  VENTE
+  ACHAT
+  SERVICE
+  CONSOMMABLE_INTERNE
+}
+
 enum CommandeStatut {
   EN_ATTENTE
   VALIDEE
-  LIVREE
+  RECUE // Changé de LIVREE à RECUE pour correspondre aux achats
 }
 
 enum TransactionType {
@@ -46,12 +55,30 @@ enum StockMovementType {
   SORTIE
 }
 
+model Magasin {
+  idMagasin    String       @id @default(uuid())
+  nom          String       @unique
+  adresse      String
+  utilisateurs Utilisateur[]
+  stocks       Stock[]
+  ventes       Vente[]
+  destockages  Destockage[]
+  commandes    Commande[]   // Achats liés à un magasin
+  transfersEnvoyes StockTransfer[] @relation("SourceTransfer")
+  transfersRecus   StockTransfer[] @relation("DestinationTransfer")
+  createdAt    DateTime     @default(now())
+
+  @@map("magasins")
+}
+
 model Utilisateur {
   idUtilisateur String   @id @default(uuid())
   nom           String
   email         String   @unique
   role          Role
   motDePasse    String
+  magasinId     String?
+  magasin       Magasin? @relation(fields: [magasinId], references: [idMagasin])
   createdAt     DateTime @default(now())
 
   @@map("utilisateurs")
@@ -62,7 +89,7 @@ model Client {
   nomClient  String
   telephone  String
   adresse    String
-  commandes  Commande[]
+  ventes     Vente[]   // Client lié directement aux ventes plutôt qu'aux commandes d'achat
   createdAt  DateTime  @default(now())
 
   @@map("clients")
@@ -72,63 +99,118 @@ model Produit {
   codeProduit  String   @id
   nomProduit   String
   format       Format
+  type         ProduitType @default(VENTE)
   categorie    String
-  stockInitial Int      // Stock initial (référence historique)
-  stockMinimum Int
   prixUnitaire Float
   fournisseur  String
-  lignes       LigneCommande[]
+  stocks       Stock[]
+  destockages  Destockage[]
+  lignesVente  LigneVente[]
   notifications Notification[]
   mouvements   StockMovement[]
+  commandes    Commande[]
+  transfers    StockTransfer[]
 
   @@map("produits")
+}
+
+model Stock {
+  idStock      String   @id @default(uuid())
+  produitId    String
+  produit      Produit  @relation(fields: [produitId], references: [codeProduit])
+  magasinId    String
+  magasin      Magasin  @relation(fields: [magasinId], references: [idMagasin])
+  quantite     Int      @default(0)
+  updatedAt    DateTime @updatedAt
+
+  @@unique([produitId, magasinId])
+  @@map("stocks")
+}
+
+model Destockage {
+  idDestock    String   @id @default(uuid())
+  produitId    String
+  produit      Produit  @relation(fields: [produitId], references: [codeProduit])
+  magasinId    String
+  magasin      Magasin  @relation(fields: [magasinId], references: [idMagasin])
+  quantite     Int
+  motif        String
+  date         DateTime @default(now())
+  userId       String
+  // utilisateur  Utilisateur @relation(fields: [userId], references: [idUtilisateur])
+
+  @@map("destockages")
 }
 
 model Commande {
   idCommande   String           @id @default(uuid())
   dateCommande DateTime         @default(now())
   statut       CommandeStatut   @default(EN_ATTENTE)
-  clientId     String
-  client       Client           @relation(fields: [clientId], references: [idClient])
-  lignes       LigneCommande[]
-  vente        Vente?
+  fournisseurId String?         // ID du fournisseur (optionnel pour l'instant)
+  produitId    String
+  produit      Produit          @relation(fields: [produitId], references: [codeProduit])
+  quantite     Int
+  magasinId    String
+  magasin      Magasin          @relation(fields: [magasinId], references: [idMagasin])
+  responsableAchatId String
+  // responsableAchat Utilisateur @relation(fields: [responsableAchatId], references: [idUtilisateur])
 
   @@map("commandes")
 }
 
-model LigneCommande {
+model Vente {
+  idVente      String   @id @default(uuid())
+  dateVente    DateTime @default(now())
+  montantTotal Float
+  modePaiement String
+  magasinId    String
+  magasin      Magasin  @relation(fields: [magasinId], references: [idMagasin])
+  clientId     String?
+  client       Client?  @relation(fields: [clientId], references: [idClient])
+  vendeurId    String
+  lignes       LigneVente[]
+  facture      Facture?
+  transaction  Transaction?
+
+  @@map("ventes")
+}
+
+model LigneVente {
   idLigne      String   @id @default(uuid())
-  commandeId   String
-  commande     Commande @relation(fields: [commandeId], references: [idCommande])
+  venteId      String
+  vente        Vente    @relation(fields: [venteId], references: [idVente])
   produitId    String
   produit      Produit  @relation(fields: [produitId], references: [codeProduit])
   quantite     Int
   prixUnitaire Float
   totalLigne   Float
 
-  @@map("lignes_commande")
+  @@map("lignes_vente")
 }
 
-model Vente {
-  idVente    String   @id @default(uuid())
-  dateVente  DateTime @default(now())
-  montantTotal Float
-  modePaiement String
-  commandeId  String? @unique
-  commande    Commande? @relation(fields: [commandeId], references: [idCommande])
-  facture     Facture?
-  transaction Transaction?
+model StockTransfer {
+  id                    String   @id @default(uuid())
+  produitId             String
+  produit               Produit  @relation(fields: [produitId], references: [codeProduit])
+  sourceMagasinId       String
+  sourceMagasin         Magasin  @relation("SourceTransfer", fields: [sourceMagasinId], references: [idMagasin])
+  destinationMagasinId  String
+  destinationMagasin    Magasin  @relation("DestinationTransfer", fields: [destinationMagasinId], references: [idMagasin])
+  quantite              Int
+  motif                 String?
+  userId                String
+  date                  DateTime @default(now())
 
-  @@map("ventes")
+  @@map("stock_transfers")
 }
 
 model Facture {
-  idFacture    String   @id @default(uuid())
+  idFacture     String   @id @default(uuid())
   numeroFacture String
-  dateFacture  DateTime @default(now())
-  montant      Float
-  venteId      String   @unique
-  vente        Vente    @relation(fields: [venteId], references: [idVente])
+  dateFacture   DateTime @default(now())
+  montant       Float
+  venteId       String   @unique
+  vente         Vente    @relation(fields: [venteId], references: [idVente])
 
   @@map("factures")
 }
@@ -161,10 +243,11 @@ model StockMovement {
   id            String              @id @default(uuid())
   codeProduit   String
   produit       Produit             @relation(fields: [codeProduit], references: [codeProduit], onDelete: Cascade)
-  type          StockMovementType   // ENTREE ou SORTIE
+  type          StockMovementType
   quantite      Int
-  motif         String              // "Livraison fournisseur", "Retour client", "Vente", etc.
-  createdBy     String?             // Email/ID de l'utilisateur qui a fait le mouvement
+  magasinId     String?             // Ajout magasin_id pour traçabilité
+  motif         String
+  createdBy     String?
   createdAt     DateTime            @default(now())
 
   @@map("stock_movements")
@@ -180,38 +263,38 @@ model Notification {
 
   @@map("notifications")
 }
+
 enum AuditAction {
   CREATE
   UPDATE
   DELETE
   LOGIN
-  EXPORT
 }
 
 model Bilan {
-  idBilan     String   @id @default(uuid())
-  exercice    String
-  dateGeneration DateTime @default(now())
-  actifImmobilise Float @default(0)
-  actifCirculant  Float @default(0)
-  totalActif      Float
-  capitauxPropres Float @default(0)
-  dettes          Float @default(0)
-  totalPassif     Float
-  generePar   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  idBilan         String   @id @default(uuid())
+  exercice        String
+  actifImmobilise Float    @default(0)
+  actifCirculant  Float    @default(0)
+  totalActif      Float    @default(0)
+  capitauxPropres Float    @default(0)
+  dettes          Float    @default(0)
+  totalPassif     Float    @default(0)
+  generePar       String
+  createdAt       DateTime @default(now())
+
   @@map("bilans")
 }
 
 model AuditLog {
-  idAudit   String   @id @default(uuid())
-  action    AuditAction
-  entite    String
-  idEntite  String
-  userId    String?
+  idAudit      String      @id @default(uuid())
+  action       AuditAction
+  entite       String
+  idEntite     String
+  userId       String?
   ancienValeurs Json?
   nouveauValeurs Json?
-  createdAt DateTime @default(now())
+  createdAt    DateTime    @default(now())
+
   @@map("audit_logs")
 }

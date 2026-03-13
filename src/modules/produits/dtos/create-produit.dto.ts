@@ -1,22 +1,30 @@
-import { IsString, IsEnum, IsInt, IsPositive, IsOptional } from 'class-validator';
+import { IsString, IsEnum, IsInt, IsOptional, IsNumber, Min } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { Format } from '@prisma/client';
+import { Format, ProduitType } from '@prisma/client';
 
 export class CreateProduitDto {
   @ApiProperty({
     description: 'Nom du produit',
-    example: 'Eau Pure',
+    example: 'Eau Pure 0.5L',
   })
   @IsString()
   nomProduit: string;
 
   @ApiProperty({
     description: 'Format de distribution',
-    enum: ['SACHET', 'BOUTEILLE', 'BONBONNE'],
+    enum: Format,
     example: 'BOUTEILLE',
   })
   @IsEnum(Format)
   format: Format;
+
+  @ApiProperty({
+    description: 'Type de produit',
+    enum: ProduitType,
+    example: 'VENTE',
+  })
+  @IsEnum(ProduitType)
+  type: ProduitType;
 
   @ApiProperty({
     description: 'Catégorie du produit',
@@ -27,34 +35,46 @@ export class CreateProduitDto {
 
   @ApiProperty({
     description: 'Stock initial du produit',
-    example: 0,
+    example: 100,
     type: 'integer',
+    default: 0,
   })
+  @IsOptional()
   @IsInt()
-  @IsPositive()
-  stockInitial: number;
+  stockInitial?: number;
 
   @ApiProperty({
     description: 'Stock minimum pour alerte',
-    example: 0,
+    example: 10,
     type: 'integer',
+    default: 0,
   })
+  @IsOptional()
   @IsInt()
-  @IsPositive()
-  stockMinimum: number;
+  stockMinimum?: number;
 
   @ApiProperty({
     description: 'Prix unitaire en FCFA',
-    example: 0,
+    example: 500,
     type: 'number',
   })
-  @IsPositive()
+  @IsNumber()
+  @Min(0)
   prixUnitaire: number;
 
   @ApiProperty({
     description: 'Nom du fournisseur',
-    example: 'Nom du fournisseur',
+    example: 'Source Centrale',
   })
   @IsString()
   fournisseur: string;
+
+  @ApiProperty({
+    description: 'ID du magasin pour le stock initial (optionnel)',
+    example: 'uuid-magasin',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  magasinId?: string;
 }

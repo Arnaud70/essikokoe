@@ -4,38 +4,47 @@ import * as bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
 async function main() {
-  // Check if admin already exists
-  const adminExists = await prisma.utilisateur.findUnique({
-    where: { email: 'admin@esikokoe.com' },
+  console.log(' Stratégie de peuplement (Seeding) en cours...');
+
+  // 1. Création du Magasin Central (Dépôt)
+  const depotCentral = await (prisma as any).magasin.upsert({
+    where: { nom: 'Dépôt Central' },
+    update: {},
+    create: {
+      nom: 'Dépôt Central',
+      adresse: 'Siège Social, Lomé',
+    },
   });
+  console.log(` Magasin créé : ${depotCentral.nom} (${depotCentral.idMagasin})`);
 
-  if (adminExists) {
-    console.log('Admin user already exists');
-    return;
-  }
-
-  // Hash password
+  // 2. Création de l'Administrateur
+  const adminEmail = 'admin@esikokoe.com';
   const hashedPassword = await bcrypt.hash('AdminPassword123!', 10);
 
-  // Create admin user
-  const admin = await prisma.utilisateur.create({
-    data: {
-      nom: 'Admin',
-      email: 'admin@esikokoe.com',
+  const admin = await prisma.utilisateur.upsert({
+    where: { email: adminEmail },
+    update: {
       motDePasse: hashedPassword,
-      role: 'ADMIN',
+      role: 'SUPERADMIN' as any,
+    },
+    create: {
+      email: adminEmail,
+      nom: 'Super Admin',
+      motDePasse: hashedPassword,
+      role: 'SUPERADMIN' as any,
+      magasinId: depotCentral.idMagasin,
     },
   });
 
-  console.log(' Admin user created successfully');
-  console.log(`Email: ${admin.email}`);
-  console.log(`Password: AdminPassword123!`);
-  console.log(`  Please change this password after first login!`);
+  console.log(' Utilisateur Admin créé/vérifié');
+  console.log(`   Email: ${admin.email}`);
+  console.log(`   Password: AdminPassword123!`);
+  console.log('Seeding terminé avec succès !');
 }
 
 main()
   .catch((e) => {
-    console.error(' Seed failed:', e);
+    console.error(' Erreur lors du seeding:', e);
     process.exit(1);
   })
   .finally(async () => {

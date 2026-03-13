@@ -4,7 +4,7 @@ import { CreateClientDto, UpdateClientDto } from '../dtos/client.dto';
 
 @Injectable()
 export class ClientsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   /**
    * 🆕 CRÉER UN CLIENT
@@ -34,13 +34,9 @@ export class ClientsService {
     const client = await this.prisma.client.findUnique({
       where: { idClient },
       include: {
-        commandes: {
+        ventes: {
           include: {
-            vente: {
-              include: {
-                facture: true,
-              },
-            },
+            facture: true,
           },
         },
       },
@@ -62,7 +58,7 @@ export class ClientsService {
   }> {
     const clients = await this.prisma.client.findMany({
       include: {
-        commandes: true,
+        ventes: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -72,7 +68,7 @@ export class ClientsService {
       nomClient: c.nomClient,
       telephone: c.telephone,
       adresse: c.adresse,
-      nombreCommandes: c.commandes.length,
+      nombreCommandes: c.ventes.length,
       dateCreation: c.createdAt,
     }));
 
@@ -98,7 +94,7 @@ export class ClientsService {
         ],
       },
       include: {
-        commandes: true,
+        ventes: true,
       },
     });
 
@@ -107,7 +103,7 @@ export class ClientsService {
       nomClient: c.nomClient,
       telephone: c.telephone,
       adresse: c.adresse,
-      nombreCommandes: c.commandes.length,
+      nombreCommandes: c.ventes.length,
       dateCreation: c.createdAt,
     }));
 
@@ -142,20 +138,20 @@ export class ClientsService {
     };
   }
 
-  
-   // SUPPRIMER UN CLIENT
-   
+  /**
+   * 🗑️ SUPPRIMER UN CLIENT
+   */
   async deleteClient(idClient: string): Promise<{
     message: string;
   }> {
-    // Vérifier si le client a des commandes
-    const commandes = await this.prisma.commande.findMany({
+    // Vérifier si le client a des ventes
+    const ventes = await this.prisma.vente.findMany({
       where: { clientId: idClient },
     });
 
-    if (commandes.length > 0) {
+    if (ventes.length > 0) {
       throw new ConflictException(
-        'Impossible de supprimer un client ayant des commandes',
+        'Impossible de supprimer un client ayant des ventes',
       );
     }
 
@@ -168,17 +164,13 @@ export class ClientsService {
     };
   }
 
-  
-   // STATISTIQUES CLIENTS
-   
+  /**
+   * 📊 STATISTIQUES CLIENTS
+   */
   async getClientsStats(): Promise<any> {
     const clients = await this.prisma.client.findMany({
       include: {
-        commandes: {
-          include: {
-            vente: true,
-          },
-        },
+        ventes: true,
       },
     });
 
@@ -189,10 +181,8 @@ export class ClientsService {
 
     clients.forEach((c) => {
       let depenseClient = 0;
-      c.commandes.forEach((cmd) => {
-        if (cmd.vente) {
-          depenseClient += cmd.vente.montantTotal;
-        }
+      c.ventes.forEach((v) => {
+        depenseClient += v.montantTotal;
       });
       totalDepense += depenseClient;
 
