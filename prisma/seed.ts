@@ -18,8 +18,8 @@ async function main() {
   console.log(` Magasin créé : ${depotCentral.nom} (${depotCentral.idMagasin})`);
 
   // 2. Création de l'Administrateur
-  const adminEmail = 'admin@esikokoe.com';
-  const hashedPassword = await bcrypt.hash('AdminPassword123!', 10);
+  const adminEmail = 'admin@essikokoe.com';
+  const hashedPassword = await bcrypt.hash('P@ssw0rd', 8);
 
   const admin = await prisma.utilisateur.upsert({
     where: { email: adminEmail },
@@ -38,7 +38,7 @@ async function main() {
 
   console.log(' Utilisateur Admin créé/vérifié');
   console.log(`   Email: ${admin.email}`);
-  console.log(`   Password: AdminPassword123!`);
+  console.log(`   Password: P@ssw0rd`);
   console.log('Seeding terminé avec succès !');
 }
 

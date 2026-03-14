@@ -98,11 +98,11 @@ model Client {
 model Produit {
   codeProduit  String   @id
   nomProduit   String
-  format       Format
+  format       String
   type         ProduitType @default(VENTE)
   categorie    String
   prixUnitaire Float
-  fournisseur  String
+  fournisseur  String?
   stocks       Stock[]
   destockages  Destockage[]
   lignesVente  LigneVente[]
@@ -111,6 +111,7 @@ model Produit {
   commandes    Commande[]
   transfers    StockTransfer[]
 
+  @@unique([nomProduit, categorie])
   @@map("produits")
 }
 

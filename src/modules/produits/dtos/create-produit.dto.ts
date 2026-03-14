@@ -11,12 +11,11 @@ export class CreateProduitDto {
   nomProduit: string;
 
   @ApiProperty({
-    description: 'Format de distribution',
-    enum: Format,
-    example: 'BOUTEILLE',
+    description: 'Format de distribution ou contenance',
+    example: 'Bouteille 1.5L',
   })
-  @IsEnum(Format)
-  format: Format;
+  @IsString()
+  format: string;
 
   @ApiProperty({
     description: 'Type de produit',
@@ -66,8 +65,9 @@ export class CreateProduitDto {
     description: 'Nom du fournisseur',
     example: 'Source Centrale',
   })
+  @IsOptional()
   @IsString()
-  fournisseur: string;
+  fournisseur?: string;
 
   @ApiProperty({
     description: 'ID du magasin pour le stock initial (optionnel)',

@@ -54,22 +54,39 @@ export class ProduitsService {
       throw new BadRequestException('Utilisateur non authentifié');
     }
 
+    // Règle 1: Unicité (Nom + Catégorie)
+    const existing = await (this.prisma as any).produit.findFirst({
+      where: {
+        nomProduit: dto.nomProduit,
+        categorie: dto.categorie,
+      },
+    });
+
+    if (existing) {
+      throw new BadRequestException(`Un produit avec le nom "${dto.nomProduit}" existe déjà dans la catégorie "${dto.categorie}"`);
+    }
+
+    // Règle 2: Fournisseur obligatoire pour ACHAT
+    if (dto.type === 'ACHAT' && !dto.fournisseur) {
+      throw new BadRequestException('Le fournisseur est obligatoire pour les produits de type ACHAT');
+    }
+
     // Les produits sont maintenant globaux
-    const count = await this.prisma.produit.count();
+    const count = await (this.prisma as any).produit.count();
     const codeProduit = `PROD-${String(count + 1).padStart(3, '0')}`;
 
     // Le stock initial est ajouté à un magasin spécifique (par défaut le dépôt central si fourni)
     const magasinId = dto.magasinId || (user.role !== 'SUPERADMIN' ? user.magasinId : undefined);
 
-    const produit = await this.prisma.produit.create({
+    const produit = await (this.prisma as any).produit.create({
       data: {
         codeProduit: codeProduit,
         nomProduit: dto.nomProduit,
-        format: dto.format as any,
+        format: dto.format,
         type: dto.type as any,
         categorie: dto.categorie,
         prixUnitaire: dto.prixUnitaire,
-        fournisseur: dto.fournisseur,
+        fournisseur: dto.fournisseur || null,
         // Relation stocks via l'upsert ou create dans la table Stock
         stocks: magasinId ? {
           create: {
