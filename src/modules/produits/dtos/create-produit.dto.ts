@@ -1,6 +1,6 @@
 import { IsString, IsEnum, IsInt, IsOptional, IsNumber, Min } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { Format, ProduitType } from '@prisma/client';
+import { ProduitType } from '@prisma/client';
 
 export class CreateProduitDto {
   @ApiProperty({

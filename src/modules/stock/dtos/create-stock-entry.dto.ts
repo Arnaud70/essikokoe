@@ -1,6 +1,5 @@
-import { IsString, IsInt, IsPositive, IsEnum } from 'class-validator';
+import { IsString, IsInt, IsPositive } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { Format } from '@prisma/client';
 
 export class CreateStockEntryDto {
   @ApiProperty({
@@ -21,11 +20,10 @@ export class CreateStockEntryDto {
 
   @ApiProperty({
     description: 'Format du produit',
-    enum: ['SACHET', 'BOUTEILLE', 'BONBONNE'],
     example: 'SACHET',
   })
-  @IsEnum(Format)
-  format: Format;
+  @IsString()
+  format: string;
 
   @ApiProperty({
     description: 'Motif de l\'entrée de stock',
