@@ -125,7 +125,13 @@ export class ProduitsService {
   }
 
   async getAllProduits(user: any): Promise<ProduitListResponseDto> {
+    const where: any = {};
+    if (user.role !== 'SUPERADMIN' && user.magasinId) {
+      where.stocks = { some: { magasinId: user.magasinId } };
+    }
+
     const produits = await (this.prisma as any).produit.findMany({
+      where,
       orderBy: { codeProduit: 'asc' },
     });
 
@@ -140,15 +146,21 @@ export class ProduitsService {
     };
   }
 
-  async searchProduits(query: string): Promise<ProduitListResponseDto> {
+  async searchProduits(query: string, user?: any): Promise<ProduitListResponseDto> {
+    const where: any = {
+      OR: [
+        { codeProduit: { contains: query, mode: 'insensitive' } },
+        { nomProduit: { contains: query, mode: 'insensitive' } },
+        { fournisseur: { contains: query, mode: 'insensitive' } },
+      ],
+    };
+
+    if (user && user.role !== 'SUPERADMIN' && user.magasinId) {
+      where.stocks = { some: { magasinId: user.magasinId } };
+    }
+
     const produits = await (this.prisma as any).produit.findMany({
-      where: {
-        OR: [
-          { codeProduit: { contains: query, mode: 'insensitive' } },
-          { nomProduit: { contains: query, mode: 'insensitive' } },
-          { fournisseur: { contains: query, mode: 'insensitive' } },
-        ],
-      },
+      where,
     });
 
     const produitsWithStock = await Promise.all(
@@ -225,7 +237,9 @@ export class ProduitsService {
 
   async getProduitsDashboardMetrics(user: any): Promise<any> {
     const produits = await (this.prisma as any).produit.findMany({
-      include: { stocks: true }
+      include: { 
+        stocks: user.role === 'SUPERADMIN' ? true : { where: { magasinId: user.magasinId } } 
+      }
     });
 
     if (produits.length === 0) {

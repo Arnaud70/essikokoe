@@ -270,8 +270,13 @@ export class VentesService {
     return { total: ventesDto.length, ventes: ventesDto };
   }
 
-  async getVentesStats(): Promise<any> {
-    const ventes = await this.prisma.vente.findMany();
+  async getVentesStats(user: any): Promise<any> {
+    const where: any = {};
+    if (user.role !== 'SUPERADMIN') {
+      where.magasinId = user.magasinId;
+    }
+
+    const ventes = await this.prisma.vente.findMany({ where });
     const montantTotal = ventes.reduce((sum, v) => sum + v.montantTotal, 0);
     const nombreVentes = ventes.length;
     const montantMoyen = nombreVentes > 0 ? montantTotal / nombreVentes : 0;

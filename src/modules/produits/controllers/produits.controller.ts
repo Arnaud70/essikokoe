@@ -41,8 +41,8 @@ export class ProduitsController {
   @Get('search/query')
   @Public()
   @ApiOperation({ summary: 'Rechercher des produits' })
-  async searchProduits(@Query('q') query: string) {
-    return await this.produitsService.searchProduits(query);
+  async searchProduits(@Query('q') query: string, @Request() req: any) {
+    return await this.produitsService.searchProduits(query, req.user);
   }
 
   @Get('filter/format')
@@ -57,6 +57,13 @@ export class ProduitsController {
   @ApiOperation({ summary: 'Statistiques agrégées par format' })
   async getStatsByFormat(): Promise<ProduitsByFormatResponseDto> {
     return await this.produitsService.getStatsByFormat();
+  }
+
+  @Get('dashboard/metrics')
+  @Roles('SUPERADMIN', 'GERANT', 'VENDEUR', 'RESPONSABLE_ACHAT')
+  @ApiOperation({ summary: 'Métriques dashboard produits' })
+  async getDashboardMetrics(@Request() req: any) {
+    return await this.produitsService.getProduitsDashboardMetrics(req.user);
   }
 
   @Post()

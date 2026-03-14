@@ -80,8 +80,8 @@ export class VentesController {
   @Get('stats/dashboard')
   @Public()
   @ApiOperation({ summary: 'Statistiques des ventes' })
-  async getVentesStats() {
-    return await this.ventesService.getVentesStats();
+  async getVentesStats(@Request() req: any) {
+    return await this.ventesService.getVentesStats(req.user);
   }
 
   @Get(':idVente')
