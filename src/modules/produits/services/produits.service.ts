@@ -50,6 +50,10 @@ export class ProduitsService {
     message: string;
     produit: any;
   }> {
+    if (!user) {
+      throw new BadRequestException('Utilisateur non authentifié');
+    }
+
     // Les produits sont maintenant globaux
     const count = await this.prisma.produit.count();
     const codeProduit = `PROD-${String(count + 1).padStart(3, '0')}`;

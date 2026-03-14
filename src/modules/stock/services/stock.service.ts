@@ -19,12 +19,12 @@ export class StockService {
 
   private async getDepotCentralId(): Promise<string> {
     const depot = await (this.prisma as any).magasin.findFirst({
-      where: { nomMagasin: 'Dépôt Central' },
+      where: { nom: 'Dépôt Central' },
     });
     if (!depot) {
       // Si le dépôt n'existe pas encore (premier lancement), on en crée un
       const newDepot = await (this.prisma as any).magasin.create({
-        data: { nomMagasin: 'Dépôt Central', emplacement: 'Lomé' }
+        data: { nom: 'Dépôt Central', adresse: 'Lomé' }
       });
       return newDepot.idMagasin;
     }
