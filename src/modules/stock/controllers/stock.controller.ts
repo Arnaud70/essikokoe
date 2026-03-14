@@ -104,7 +104,7 @@ export class StockController {
    * @route GET /stock/critical
    */
   @Get('critical')
-  @Roles('SUPERADMIN', 'GERANT', 'MAGASINIER')
+  @Roles('SUPERADMIN', 'GERANT', 'MAGASINIER', 'VENDEUR', 'RESPONSABLE_ACHAT')
   @ApiOperation({
     summary: 'Détail des produits en stock critique',
   })
@@ -130,7 +130,7 @@ export class StockController {
    * @route GET /stock/history
    */
   @Get('history')
-  @Roles('SUPERADMIN', 'GERANT', 'MAGASINIER')
+  @Roles('SUPERADMIN', 'GERANT', 'MAGASINIER', 'VENDEUR', 'RESPONSABLE_ACHAT')
   @ApiOperation({
     summary: 'Historique des mouvements de stock',
   })

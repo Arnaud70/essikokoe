@@ -111,7 +111,7 @@ model Produit {
   commandes    Commande[]
   transfers    StockTransfer[]
 
-  @@unique([nomProduit, categorie])
+  @@unique([nomProduit, format])
   @@map("produits")
 }
 

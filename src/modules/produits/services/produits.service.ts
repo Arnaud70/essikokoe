@@ -72,12 +72,12 @@ export class ProduitsService {
     const existing = await (this.prisma as any).produit.findFirst({
       where: {
         nomProduit: dto.nomProduit,
-        categorie: dto.categorie,
+        format: dto.format,
       },
     });
 
     if (existing) {
-      throw new BadRequestException(`Un produit avec le nom "${dto.nomProduit}" existe déjà dans la catégorie "${dto.categorie}"`);
+      throw new BadRequestException(`Un produit avec le nom "${dto.nomProduit}" existe déjà avec le format "${dto.format}"`);
     }
 
     // Règle 2: Fournisseur obligatoire pour ACHAT
