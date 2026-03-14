@@ -13,7 +13,7 @@ export class RapportsService {
 
   async getProduitsRapport(user: any, dateDebut?: Date, dateFin?: Date) {
     const ventes = dateDebut && dateFin
-      ? (await this.ventesService.getVentesByDateRange(dateDebut, dateFin)).ventes
+      ? (await this.ventesService.getVentesByDateRange(dateDebut, dateFin, user)).ventes
       : (await this.ventesService.getAllVentes(user)).ventes;
 
     const ventesDetails = await Promise.all(
