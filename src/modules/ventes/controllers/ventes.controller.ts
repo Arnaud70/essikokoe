@@ -46,39 +46,36 @@ export class VentesController {
   }
 
   @Get()
-  @Public()
+  @Roles('SUPERADMIN', 'GERANT', 'VENDEUR', 'RESPONSABLE_ACHAT')
   @ApiOperation({ summary: 'Lister toutes les ventes' })
   async getAllVentes(@Request() req: any) {
     return await this.ventesService.getAllVentes(req.user);
   }
 
   @Get('search/query')
-  @Public()
+  @Roles('SUPERADMIN', 'GERANT', 'VENDEUR', 'RESPONSABLE_ACHAT')
   @ApiOperation({ summary: 'Rechercher des ventes' })
   async searchVentes(@Query('q') query: string, @Request() req: any) {
-    if (!query || query.trim().length < 2) {
-      throw new Error('La requête doit contenir au moins 2 caractères');
-    }
     return await this.ventesService.searchVentes(query, req.user);
   }
 
   @Get('filter/date')
-  @Public()
-  @ApiOperation({ summary: 'Filtrer les ventes par plage de dates' })
+  @Roles('SUPERADMIN', 'GERANT', 'VENDEUR')
+  @ApiOperation({ summary: 'Filtrer les ventes par date' })
   async getVentesByDateRange(
     @Query('debut') debut: string,
     @Query('fin') fin: string,
+    @Request() req: any,
   ) {
-    const dateDebut = new Date(debut);
-    const dateFin = new Date(fin);
-    if (isNaN(dateDebut.getTime()) || isNaN(dateFin.getTime())) {
-      throw new Error('Format de date invalide');
-    }
-    return await this.ventesService.getVentesByDateRange(dateDebut, dateFin);
+    return await this.ventesService.getVentesByDateRange(
+      new Date(debut),
+      new Date(fin),
+      req.user,
+    );
   }
 
   @Get('stats/dashboard')
-  @Public()
+  @Roles('SUPERADMIN', 'GERANT', 'VENDEUR')
   @ApiOperation({ summary: 'Statistiques des ventes' })
   async getVentesStats(@Request() req: any) {
     return await this.ventesService.getVentesStats(req.user);

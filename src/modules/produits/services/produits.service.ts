@@ -27,11 +27,24 @@ export class ProduitsService {
   }
 
   private getStatut(stock: number, stockMinimum: number): string {
-    return stock < stockMinimum ? 'Stock Faible' : 'En stock';
+    return stock <= stockMinimum ? 'Stock Faible' : 'En stock';
   }
 
-  private async mapProduitToDto(produit: any, magasinId?: string): Promise<any> {
-    const stock = await this.getRealStock(produit.codeProduit, magasinId);
+  private async mapProduitToDto(produit: any, user?: any): Promise<any> {
+    const isSuperAdmin = user?.role?.toUpperCase() === 'SUPERADMIN';
+    const magasinId = user?.magasinId;
+
+    let stock = 0;
+    if (isSuperAdmin && !magasinId) {
+      // Pour superadmin sans filtre magasin, on somme tout le stock
+      const allStocks = await (this.prisma as any).stock.findMany({
+        where: { produitId: produit.codeProduit }
+      });
+      stock = allStocks.reduce((acc, s) => acc + s.quantite, 0);
+    } else {
+      stock = await this.getRealStock(produit.codeProduit, magasinId);
+    }
+    
     const statut = this.getStatut(stock, (produit as any).stockMinimum || 0);
 
     return {
@@ -43,6 +56,7 @@ export class ProduitsService {
       statut: statut,
       prixUnitaire: produit.prixUnitaire,
       fournisseur: produit.fournisseur,
+      categorie: produit.categorie,
     };
   }
 
@@ -126,7 +140,9 @@ export class ProduitsService {
 
   async getAllProduits(user: any): Promise<ProduitListResponseDto> {
     const where: any = {};
-    if (user.role !== 'SUPERADMIN' && user.magasinId) {
+    const isSuperAdmin = user?.role?.toUpperCase() === 'SUPERADMIN';
+
+    if (!isSuperAdmin && user?.magasinId) {
       where.stocks = { some: { magasinId: user.magasinId } };
     }
 
@@ -137,7 +153,7 @@ export class ProduitsService {
 
     // Si l'utilisateur est lié à un magasin, on montre son stock local
     const produitsWithStock = await Promise.all(
-      produits.map((p) => this.mapProduitToDto(p, user?.magasinId)),
+      produits.map((p) => this.mapProduitToDto(p, user)),
     );
 
     return {
@@ -155,7 +171,8 @@ export class ProduitsService {
       ],
     };
 
-    if (user && user.role !== 'SUPERADMIN' && user.magasinId) {
+    const isSuperAdmin = user?.role?.toUpperCase() === 'SUPERADMIN';
+    if (user && !isSuperAdmin && user.magasinId) {
       where.stocks = { some: { magasinId: user.magasinId } };
     }
 
@@ -164,7 +181,7 @@ export class ProduitsService {
     });
 
     const produitsWithStock = await Promise.all(
-      produits.map((p) => this.mapProduitToDto(p)),
+      produits.map((p) => this.mapProduitToDto(p, user)),
     );
 
     return {

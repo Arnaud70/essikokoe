@@ -70,9 +70,9 @@ export class StockController {
    * @route GET /stock/inventory
    */
   @Get('inventory')
-  @Public()
+  @Roles('SUPERADMIN', 'GERANT', 'MAGASINIER', 'VENDEUR', 'RESPONSABLE_ACHAT')
   @ApiOperation({
-    summary: 'Consulter l\'inventaire complet',
+    summary: "Consulter l'inventaire complet",
   })
   @ApiResponse({
     status: 200,
@@ -87,7 +87,7 @@ export class StockController {
    * @route GET /stock/by-format
    */
   @Get('by-format')
-  @Public()
+  @Roles('SUPERADMIN', 'GERANT', 'MAGASINIER')
   @ApiOperation({
     summary: 'Stock agrégé par format de produit',
   })
@@ -104,7 +104,7 @@ export class StockController {
    * @route GET /stock/critical
    */
   @Get('critical')
-  @Public()
+  @Roles('SUPERADMIN', 'GERANT', 'MAGASINIER')
   @ApiOperation({
     summary: 'Détail des produits en stock critique',
   })
@@ -117,8 +117,7 @@ export class StockController {
    * @route GET /stock/dashboard
    */
   @Get('dashboard')
-  @Public()
-  @Roles('SUPERADMIN', 'GERANT')
+  @Roles('SUPERADMIN', 'GERANT', 'VENDEUR', 'RESPONSABLE_ACHAT', 'MAGASINIER')
   @ApiOperation({
     summary: 'Métriques de stock pour tableau de bord',
   })
@@ -131,7 +130,7 @@ export class StockController {
    * @route GET /stock/history
    */
   @Get('history')
-  @Public()
+  @Roles('SUPERADMIN', 'GERANT', 'MAGASINIER')
   @ApiOperation({
     summary: 'Historique des mouvements de stock',
   })

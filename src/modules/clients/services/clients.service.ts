@@ -167,10 +167,10 @@ export class ClientsService {
   /**
    * 📊 STATISTIQUES CLIENTS
    */
-  async getClientsStats(): Promise<any> {
+  async getClientsStats(user: any): Promise<any> {
     const clients = await this.prisma.client.findMany({
       include: {
-        ventes: true,
+        ventes: user.role === 'SUPERADMIN' ? true : { where: { magasinId: user.magasinId } },
       },
     });
 

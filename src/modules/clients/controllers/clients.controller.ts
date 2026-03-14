@@ -9,6 +9,7 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  Request,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -33,7 +34,8 @@ export class ClientsController {
    //  CRÉER UN CLIENT
    
   @Post()
-  @Roles('ADMIN', 'AGENT')
+  @Post()
+  @Roles('SUPERADMIN', 'GERANT', 'VENDEUR', 'RESPONSABLE_ACHAT')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Créer un nouveau client',
@@ -51,7 +53,7 @@ export class ClientsController {
     // LISTER TOUS LES CLIENTS
    
   @Get()
-  @Public()
+  @Roles('SUPERADMIN', 'GERANT', 'VENDEUR', 'RESPONSABLE_ACHAT')
   @ApiOperation({
     summary: 'Lister tous les clients',
     description: 'Retourne la liste de tous les clients enregistrés',
@@ -95,7 +97,7 @@ export class ClientsController {
    //  STATISTIQUES CLIENTS
    
   @Get('stats/dashboard')
-  @Public()
+  @Roles('SUPERADMIN', 'GERANT', 'VENDEUR', 'RESPONSABLE_ACHAT')
   @ApiOperation({
     summary: 'Statistiques des clients',
     description:
@@ -105,8 +107,8 @@ export class ClientsController {
     status: 200,
     description: 'Statistiques des clients',
   })
-  async getClientsStats() {
-    return await this.clientsService.getClientsStats();
+  async getClientsStats(@Request() req: any) {
+    return await this.clientsService.getClientsStats(req.user);
   }
 
   
@@ -139,7 +141,8 @@ export class ClientsController {
    //METTRE À JOUR UN CLIENT
    
   @Put(':idClient')
-  @Roles('ADMIN', 'AGENT')
+  @Put(':idClient')
+  @Roles('SUPERADMIN', 'GERANT', 'VENDEUR')
   @ApiOperation({
     summary: 'Mettre à jour un client',
     description: 'Modifie les informations du client',
@@ -167,7 +170,8 @@ export class ClientsController {
   
    // SUPPRIMER UN CLIENT
   @Delete(':idClient')
-  @Roles('ADMIN')
+  @Delete(':idClient')
+  @Roles('SUPERADMIN', 'GERANT')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Supprimer un client',

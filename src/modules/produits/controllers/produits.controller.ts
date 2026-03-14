@@ -32,14 +32,14 @@ export class ProduitsController {
   constructor(private produitsService: ProduitsService) { }
 
   @Get()
-  @Public()
+  @Roles('SUPERADMIN', 'GERANT', 'VENDEUR', 'RESPONSABLE_ACHAT', 'MAGASINIER')
   @ApiOperation({ summary: 'Lister tous les produits' })
   async getAllProduits(@Request() req: any) {
     return await this.produitsService.getAllProduits(req.user);
   }
 
   @Get('search/query')
-  @Public()
+  @Roles('SUPERADMIN', 'GERANT', 'VENDEUR', 'RESPONSABLE_ACHAT')
   @ApiOperation({ summary: 'Rechercher des produits' })
   async searchProduits(@Query('q') query: string, @Request() req: any) {
     return await this.produitsService.searchProduits(query, req.user);

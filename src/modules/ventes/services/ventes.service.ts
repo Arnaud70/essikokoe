@@ -244,10 +244,13 @@ export class VentesService {
     return { total: ventesDto.length, ventes: ventesDto };
   }
 
-  async getVentesByDateRange(dateDebut: Date, dateFin: Date): Promise<VenteListResponseDto> {
-    // TODO: Add magasin filtering if needed, for now keeping original logic but it should probably take user context
+  async getVentesByDateRange(dateDebut: Date, dateFin: Date, user: any): Promise<VenteListResponseDto> {
+    const where: any = { dateVente: { gte: dateDebut, lte: dateFin } };
+    if (user.role !== 'SUPERADMIN' && user.magasinId) {
+      where.magasinId = user.magasinId;
+    }
     const ventes = await this.prisma.vente.findMany({
-      where: { dateVente: { gte: dateDebut, lte: dateFin } },
+      where,
       include: { client: true, facture: true },
       orderBy: { dateVente: 'desc' },
     });
