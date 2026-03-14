@@ -75,8 +75,16 @@ export class ProduitsService {
     const count = await (this.prisma as any).produit.count();
     const codeProduit = `PROD-${String(count + 1).padStart(3, '0')}`;
 
-    // Le stock initial est ajouté à un magasin spécifique (par défaut le dépôt central si fourni)
-    const magasinId = dto.magasinId || (user.role !== 'SUPERADMIN' ? user.magasinId : undefined);
+    // Déterminer le magasin cible pour le stock initial
+    let targetMagasinId = dto.magasinId || user.magasinId;
+
+    if (!targetMagasinId) {
+      // Si aucun magasin n'est lié, on cherche le Dépôt Central
+      const central = await (this.prisma as any).magasin.findFirst({
+        where: { nom: 'Dépôt Central' },
+      });
+      targetMagasinId = central?.idMagasin;
+    }
 
     const produit = await (this.prisma as any).produit.create({
       data: {
@@ -88,9 +96,9 @@ export class ProduitsService {
         prixUnitaire: dto.prixUnitaire,
         fournisseur: dto.fournisseur || null,
         // Relation stocks via l'upsert ou create dans la table Stock
-        stocks: magasinId ? {
+        stocks: targetMagasinId ? {
           create: {
-            magasinId: magasinId,
+            magasinId: targetMagasinId,
             quantite: dto.stockInitial || 0,
           }
         } : undefined,
