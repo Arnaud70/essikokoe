@@ -235,13 +235,22 @@ export class ProduitsService {
     };
   }
 
-  async updateProduit(codeProduit: string, dto: UpdateProduitDto): Promise<any> {
+  async updateProduit(codeProduit: string, dto: UpdateProduitDto | any): Promise<any> {
     const produit = await (this.prisma as any).produit.findUnique({ where: { codeProduit } });
     if (!produit) throw new NotFoundException('Produit non trouvé');
 
+    const dataToUpdate: any = {};
+    if (dto.nomProduit !== undefined) dataToUpdate.nomProduit = dto.nomProduit;
+    if (dto.format !== undefined) dataToUpdate.format = dto.format;
+    if (dto.categorie !== undefined) dataToUpdate.categorie = dto.categorie;
+    if (dto.type !== undefined) dataToUpdate.type = dto.type;
+    if (dto.prixUnitaire !== undefined) dataToUpdate.prixUnitaire = dto.prixUnitaire;
+    // Fournisseur peut être null ou undefined, on respecte le standard Prisma
+    if (dto.fournisseur !== undefined) dataToUpdate.fournisseur = dto.fournisseur;
+
     const updated = await (this.prisma as any).produit.update({
       where: { codeProduit },
-      data: dto,
+      data: dataToUpdate,
     });
 
     return { message: 'Produit mis à jour avec succès', produit: updated };

@@ -13,6 +13,15 @@ export class UpdateProduitDto {
   nomProduit?: string;
 
   @ApiProperty({
+    description: 'Format du produit',
+    example: 'SACHET',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  format?: string;
+
+  @ApiProperty({
     description: 'Type de produit',
     enum: ProduitType,
     example: 'VENTE',
@@ -30,17 +39,6 @@ export class UpdateProduitDto {
   @IsOptional()
   @IsString()
   categorie?: string;
-
-  @ApiProperty({
-    description: 'Stock minimum pour alerte',
-    example: 150,
-    type: 'integer',
-    required: false,
-  })
-  @IsOptional()
-  @IsInt()
-  @IsPositive()
-  stockMinimum?: number;
 
   @ApiProperty({
     description: 'Prix unitaire en FCFA',
@@ -61,4 +59,13 @@ export class UpdateProduitDto {
   @IsOptional()
   @IsString()
   fournisseur?: string;
+
+  // Optionnels (non sauvegardés directement sur Produit mais envoyés par le front)
+  @IsOptional()
+  @IsInt()
+  stockMinimum?: number;
+
+  @IsOptional()
+  @IsInt()
+  stockInitial?: number;
 }

@@ -26,12 +26,12 @@ import { AuditStatusDto, AuditEquilibrationDto, AuditTrendDto } from '../dtos/au
 @Controller('comptabilite')
 @ApiBearerAuth()
 export class ComptabiliteController {
-  constructor(private readonly comptabiliteService: ComptabiliteService) {}
+  constructor(private readonly comptabiliteService: ComptabiliteService) { }
 
   // ===== TRANSACTIONS =====
-  
+
   @Post('transactions')
-  @Roles('ADMIN')
+  @Roles('SUPERADMIN', 'GERANT')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Créer une transaction (recette/dépense)' })
   @ApiBody({ type: CreateTransactionDto })
@@ -66,7 +66,7 @@ export class ComptabiliteController {
   }
 
   // ===== RAPPORTS =====
-  
+
   @Get('rapports')
   @Public()
   @ApiOperation({ summary: 'Lister les rapports comptables' })
@@ -76,7 +76,7 @@ export class ComptabiliteController {
   }
 
   @Post('rapports')
-  @Roles('ADMIN')
+  @Roles('SUPERADMIN', 'GERANT')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Créer un rapport (journalier/mensuel)' })
   @ApiBody({ type: CreateRapportDto })
@@ -86,7 +86,7 @@ export class ComptabiliteController {
   }
 
   // ===== BILAN =====
-  
+
   @Get('bilan/summary')
   @Public()
   @ApiOperation({ summary: 'Obtenir le bilan financier détaillé' })
@@ -104,7 +104,7 @@ export class ComptabiliteController {
   }
 
   @Post('bilan')
-  @Roles('ADMIN')
+  @Roles('SUPERADMIN', 'GERANT')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Créer un bilan comptable' })
   @ApiBody({ type: CreateBilanDto })
@@ -114,7 +114,7 @@ export class ComptabiliteController {
   }
 
   // ===== AUDIT =====
-  
+
   @Get('audit/status')
   @Public()
   @ApiOperation({ summary: 'Statut d\'audit - transactions vérifiées et écarts' })
