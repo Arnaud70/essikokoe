@@ -324,7 +324,7 @@ export class StockService {
       mouvements: mouvements.map(m => ({
         id: m.id,
         date: m.createdAt,
-        produit: m.produit.nomProduit,
+        produit: m.produit?.nomProduit || `Produit supprimé (${m.codeProduit})`,
         type: m.type === 'ENTREE' ? '+' : '-',
         quantite: m.quantite,
         motif: m.motif,
