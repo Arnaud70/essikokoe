@@ -319,19 +319,35 @@ export class StockService {
       take: limit,
     });
 
+    const magasins = await (this.prisma as any).magasin.findMany({
+      select: { idMagasin: true, nom: true }
+    });
+    const magasinMap = new Map<string, string>();
+    magasins.forEach(m => magasinMap.set(m.idMagasin, m.nom));
+
     return {
       total: mouvements.length,
-      mouvements: mouvements.map(m => ({
-        id: m.id,
-        date: m.createdAt,
-        produit: m.produit?.nomProduit || `Produit supprimé (${m.codeProduit})`,
-        format: m.produit?.format || '-',
-        produitType: m.produit?.type || 'Inconnu',
-        type: m.type === 'ENTREE' ? '+' : '-',
-        quantite: m.quantite,
-        motif: m.motif,
-        utilisateur: m.createdBy,
-      })),
+      mouvements: mouvements.map(m => {
+        let motifFormatte = m.motif;
+        if (motifFormatte) {
+          const uuidRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+          motifFormatte = motifFormatte.replace(uuidRegex, (match) => {
+            return magasinMap.get(match) || match;
+          });
+        }
+
+        return {
+          id: m.id,
+          date: m.createdAt,
+          produit: m.produit?.nomProduit || `Produit supprimé (${m.codeProduit})`,
+          format: m.produit?.format || '-',
+          produitType: m.produit?.type || 'Inconnu',
+          type: m.type === 'ENTREE' ? '+' : '-',
+          quantite: m.quantite,
+          motif: motifFormatte,
+          utilisateur: m.createdBy,
+        };
+      }),
     };
   }
 }
