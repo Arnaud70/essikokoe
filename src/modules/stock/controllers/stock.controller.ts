@@ -31,10 +31,10 @@ import { Public } from '../../../auth/decorators/public.decorator';
 export class StockController {
   constructor(private stockService: StockService) { }
 
-  /**
-   *  Enregistrer une entrée de stock
-   * @route POST /stock/entry
-   */
+
+  // Enregistrer une entrée de stock
+  //@route POST /stock/entry
+
   @Post('entry')
   @Roles('SUPERADMIN', 'GERANT', 'MAGASINIER', 'RESPONSABLE_ACHAT')
   @HttpCode(HttpStatus.CREATED)
@@ -51,10 +51,10 @@ export class StockController {
     return await this.stockService.registerStockEntry(dto, req.user);
   }
 
-  /**
-   *  Déduire du stock après vente
-   * @route POST /stock/deduct
-   */
+
+  //Déduire du stock après vente
+  //@route POST /stock/deduct
+
   @Post('deduct')
   @Roles('SUPERADMIN', 'GERANT', 'MAGASINIER')
   @HttpCode(HttpStatus.OK)
@@ -65,10 +65,10 @@ export class StockController {
     return await this.stockService.deductStock(dto, req.user);
   }
 
-  /**
-   * 👁️ Consulter l'inventaire complet
-   * @route GET /stock/inventory
-   */
+
+  // Consulter l'inventaire complet
+  //@route GET /stock/inventory
+
   @Get('inventory')
   @Roles('SUPERADMIN', 'GERANT', 'MAGASINIER', 'VENDEUR', 'RESPONSABLE_ACHAT')
   @ApiOperation({
@@ -82,10 +82,10 @@ export class StockController {
     return await this.stockService.getInventory(req.user);
   }
 
-  /**
-   *  Stock par type de produit
-   * @route GET /stock/by-format
-   */
+
+  // Stock par type de produit
+  // @route GET /stock/by-format
+
   @Get('by-format')
   @Roles('SUPERADMIN', 'GERANT', 'MAGASINIER')
   @ApiOperation({
@@ -99,10 +99,10 @@ export class StockController {
     return await this.stockService.getStockByFormat(req.user);
   }
 
-  /**
-   *  Produits en alerte (seuils critiques)
-   * @route GET /stock/critical
-   */
+
+  //Produits en alerte (seuils critiques)
+  //@route GET /stock/critical
+
   @Get('critical')
   @Roles('SUPERADMIN', 'GERANT', 'MAGASINIER', 'VENDEUR', 'RESPONSABLE_ACHAT')
   @ApiOperation({
@@ -112,10 +112,10 @@ export class StockController {
     return await this.stockService.getCriticalStocks(req.user);
   }
 
-  /**
-   *  Métriques pour dashboard
-   * @route GET /stock/dashboard
-   */
+
+  //Métriques pour dashboard
+  //@route GET /stock/dashboard
+
   @Get('dashboard')
   @Roles('SUPERADMIN', 'GERANT', 'VENDEUR', 'RESPONSABLE_ACHAT', 'MAGASINIER')
   @ApiOperation({
@@ -125,22 +125,24 @@ export class StockController {
     return await this.stockService.getStockDashboardMetrics(req.user);
   }
 
-  /**
-   *  Historique des mouvements de stock
-   * @route GET /stock/history
-   */
+
+  // Historique des mouvements de stock
+  //@route GET /stock/history
+
   @Get('history')
   @Roles('SUPERADMIN', 'GERANT', 'MAGASINIER', 'VENDEUR', 'RESPONSABLE_ACHAT')
   @ApiOperation({
     summary: 'Historique des mouvements de stock',
   })
-  async getStockHistory(@Query('limit') limit: number, @Request() req: any) {
-    return await this.stockService.getStockMovementHistory(req.user, limit || 100);
+  async getStockHistory(@Query('limit') limit: any, @Request() req: any) {
+    const parsedLimit = parseInt(limit, 10);
+    const finalLimit = isNaN(parsedLimit) || parsedLimit <= 0 ? 100 : parsedLimit;
+    return await this.stockService.getStockMovementHistory(req.user, finalLimit);
   }
 
-  /**
-   * 📉 Enregistrer un transfert/distribution de stock
-   */
+
+  // Enregistrer un transfert/distribution de stock
+
   @Post('transfer')
   @Roles('SUPERADMIN')
   @ApiOperation({ summary: 'Transférer ou distribuer du stock entre magasins (SUPERADMIN)' })
@@ -148,9 +150,9 @@ export class StockController {
     return this.stockService.transferStock(dto, req.user);
   }
 
-  /**
-   * 📜 Consulter l'historique des transferts
-   */
+
+  //  Consulter l'historique des transferts
+
   @Get('transfers')
   @Roles('SUPERADMIN', 'GERANT')
   @ApiOperation({ summary: 'Lister les transferts/distributions effectués' })
