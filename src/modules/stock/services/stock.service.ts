@@ -73,10 +73,10 @@ export class StockService {
     };
   }
 
-  /**
-   * 🔄 TRANSFERT DE STOCK (DISTRIBUTION ENTRE MAGASINS)
-   * Réservé au SUPERADMIN
-   */
+
+  //TRANSFERT DE STOCK (DISTRIBUTION ENTRE MAGASINS)
+  // Réservé au SUPERADMIN
+
   async transferStock(dto: TransferStockDto, user: any): Promise<any> {
     const { codeProduit, quantite, destinationMagasinId, motif } = dto;
     let { sourceMagasinId } = dto;
@@ -325,6 +325,8 @@ export class StockService {
         id: m.id,
         date: m.createdAt,
         produit: m.produit?.nomProduit || `Produit supprimé (${m.codeProduit})`,
+        format: m.produit?.format || '-',
+        produitType: m.produit?.type || 'Inconnu',
         type: m.type === 'ENTREE' ? '+' : '-',
         quantite: m.quantite,
         motif: m.motif,
