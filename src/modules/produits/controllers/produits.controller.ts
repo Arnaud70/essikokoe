@@ -34,15 +34,15 @@ export class ProduitsController {
   @Get()
   @Roles('SUPERADMIN', 'GERANT', 'VENDEUR', 'RESPONSABLE_ACHAT', 'MAGASINIER')
   @ApiOperation({ summary: 'Lister tous les produits' })
-  async getAllProduits(@Request() req: any) {
-    return await this.produitsService.getAllProduits(req.user);
+  async getAllProduits(@Query('magasinId') magasinId: string, @Request() req: any) {
+    return await this.produitsService.getAllProduits(req.user, magasinId);
   }
 
   @Get('search/query')
   @Roles('SUPERADMIN', 'GERANT', 'VENDEUR', 'RESPONSABLE_ACHAT')
   @ApiOperation({ summary: 'Rechercher des produits' })
-  async searchProduits(@Query('q') query: string, @Request() req: any) {
-    return await this.produitsService.searchProduits(query, req.user);
+  async searchProduits(@Query('q') query: string, @Query('magasinId') magasinId: string, @Request() req: any) {
+    return await this.produitsService.searchProduits(query, req.user, magasinId);
   }
 
   @Get('filter/format')
@@ -62,8 +62,8 @@ export class ProduitsController {
   @Get('dashboard/metrics')
   @Roles('SUPERADMIN', 'GERANT', 'VENDEUR', 'RESPONSABLE_ACHAT')
   @ApiOperation({ summary: 'Métriques dashboard produits' })
-  async getDashboardMetrics(@Request() req: any) {
-    return await this.produitsService.getProduitsDashboardMetrics(req.user);
+  async getDashboardMetrics(@Query('magasinId') magasinId: string, @Request() req: any) {
+    return await this.produitsService.getProduitsDashboardMetrics(req.user, magasinId);
   }
 
   @Post()

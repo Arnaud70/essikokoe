@@ -30,9 +30,9 @@ export class ProduitsService {
     return stock <= stockMinimum ? 'Stock Faible' : 'En stock';
   }
 
-  private async mapProduitToDto(produit: any, user?: any): Promise<any> {
+  private async mapProduitToDto(produit: any, user?: any, requestedMagasinId?: string): Promise<any> {
     const isSuperAdmin = user?.role?.toUpperCase() === 'SUPERADMIN';
-    const magasinId = user?.magasinId;
+    const magasinId = isSuperAdmin && requestedMagasinId ? requestedMagasinId : user?.magasinId;
 
     let stock = 0;
     if (isSuperAdmin && !magasinId) {
@@ -138,12 +138,14 @@ export class ProduitsService {
     return produit;
   }
 
-  async getAllProduits(user: any): Promise<ProduitListResponseDto> {
+  async getAllProduits(user: any, requestedMagasinId?: string): Promise<ProduitListResponseDto> {
     const where: any = {};
     const isSuperAdmin = user?.role?.toUpperCase() === 'SUPERADMIN';
+    
+    const targetMagasinId = isSuperAdmin && requestedMagasinId ? requestedMagasinId : (!isSuperAdmin ? user?.magasinId : null);
 
-    if (!isSuperAdmin && user?.magasinId) {
-      where.stocks = { some: { magasinId: user.magasinId } };
+    if (targetMagasinId) {
+      where.stocks = { some: { magasinId: targetMagasinId } };
     }
 
     const produits = await (this.prisma as any).produit.findMany({
@@ -151,9 +153,9 @@ export class ProduitsService {
       orderBy: { codeProduit: 'asc' },
     });
 
-    // Si l'utilisateur est lié à un magasin, on montre son stock local
+    // Si l'utilisateur est lié à un magasin ou a un filtre, on montre son stock local
     const produitsWithStock = await Promise.all(
-      produits.map((p) => this.mapProduitToDto(p, user)),
+      produits.map((p) => this.mapProduitToDto(p, user, targetMagasinId)),
     );
 
     return {
@@ -162,7 +164,7 @@ export class ProduitsService {
     };
   }
 
-  async searchProduits(query: string, user?: any): Promise<ProduitListResponseDto> {
+  async searchProduits(query: string, user?: any, requestedMagasinId?: string): Promise<ProduitListResponseDto> {
     const where: any = {
       OR: [
         { codeProduit: { contains: query, mode: 'insensitive' } },
@@ -172,8 +174,10 @@ export class ProduitsService {
     };
 
     const isSuperAdmin = user?.role?.toUpperCase() === 'SUPERADMIN';
-    if (user && !isSuperAdmin && user.magasinId) {
-      where.stocks = { some: { magasinId: user.magasinId } };
+    const targetMagasinId = isSuperAdmin && requestedMagasinId ? requestedMagasinId : (!isSuperAdmin ? user?.magasinId : null);
+
+    if (targetMagasinId) {
+      where.stocks = { some: { magasinId: targetMagasinId } };
     }
 
     const produits = await (this.prisma as any).produit.findMany({
@@ -181,7 +185,7 @@ export class ProduitsService {
     });
 
     const produitsWithStock = await Promise.all(
-      produits.map((p) => this.mapProduitToDto(p, user)),
+      produits.map((p) => this.mapProduitToDto(p, user, targetMagasinId)),
     );
 
     return {
@@ -261,10 +265,13 @@ export class ProduitsService {
     return { message: 'Produit supprimé avec succès' };
   }
 
-  async getProduitsDashboardMetrics(user: any): Promise<any> {
+  async getProduitsDashboardMetrics(user: any, requestedMagasinId?: string): Promise<any> {
+    const isSuperAdmin = user?.role?.toUpperCase() === 'SUPERADMIN';
+    const targetMagasinId = isSuperAdmin && requestedMagasinId ? requestedMagasinId : (!isSuperAdmin ? user?.magasinId : null);
+
     const produits = await (this.prisma as any).produit.findMany({
       include: { 
-        stocks: user.role === 'SUPERADMIN' ? true : { where: { magasinId: user.magasinId } } 
+        stocks: isSuperAdmin && !targetMagasinId ? true : { where: { magasinId: targetMagasinId } } 
       }
     });
 
