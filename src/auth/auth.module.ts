@@ -17,6 +17,7 @@ import { RolesGuard } from './guards/roles.guard';
     JwtModule.register({
       secret: jwtConstants.secret,
     }),
+    PrismaModule,
   ],
   providers: [AuthService, JwtStrategy],
   controllers: [AuthController],

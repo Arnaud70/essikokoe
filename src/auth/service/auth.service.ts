@@ -3,10 +3,15 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from '../../users/service/users.service';
 import { jwtConstants } from '../constants';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class AuthService {
-  constructor(private usersService: UsersService, private jwtService: JwtService) { }
+  constructor(
+    private usersService: UsersService, 
+    private jwtService: JwtService,
+    private prisma: PrismaService
+  ) { }
 
   async validateUser(email: string, pass: string) {
     const user = await this.usersService.findByEmail(email);
@@ -21,12 +26,26 @@ export class AuthService {
     return null;
   }
 
-  async login(user: any) {
+  async login(user: any, metadata?: { userAgent?: string; ip?: string }) {
     if (!user) throw new UnauthorizedException();
     const payload = { sub: user.idUtilisateur, email: user.email, role: user.role, magasinId: user.magasinId };
     const accessToken = this.jwtService.sign(payload, { expiresIn: '1d' });
     const refreshPayload = { ...payload, type: 'refresh' };
     const refreshToken = this.jwtService.sign(refreshPayload, { expiresIn: '7d' });
+
+    // Créer une session dans la DB
+    if (metadata) {
+      await this.prisma.userSession.create({
+        data: {
+          utilisateurId: user.idUtilisateur,
+          userAgent: metadata.userAgent,
+          ipAddress: metadata.ip,
+          location: 'Lomé, Togo', // Simulation de localisation pour l'instant
+          current: true, // On marquera les autres comme false plus tard ou on gérera côté front
+        }
+      });
+    }
+
     return { accessToken, refreshToken };
   }
 

@@ -20,7 +20,7 @@ export class AuthController {
   @Public()
   @ApiOperation({ summary: 'Login user and receive access + refresh tokens' })
   @ApiResponse({ status: 201, type: LoginResponseDto })
-  async login(@Body() loginDto: LoginDto) {
+  async login(@Body() loginDto: LoginDto, @Request() req: any) {
     // Vérification email
     const userByEmail = await this.usersService.findByEmail(loginDto.email);
     if (!userByEmail) {
@@ -31,7 +31,11 @@ export class AuthController {
     if (!user) {
       return { error: 'Mot de passe incorrect' };
     }
-    return this.authService.login(user);
+    
+    const userAgent = req.headers['user-agent'];
+    const ip = req.ip;
+    
+    return this.authService.login(userByEmail, { userAgent, ip });
   }
 
   @Post('register')

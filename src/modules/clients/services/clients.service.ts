@@ -69,6 +69,7 @@ export class ClientsService {
       telephone: c.telephone,
       adresse: c.adresse,
       nombreCommandes: c.ventes.length,
+      totalDepense: c.ventes.reduce((sum, v) => sum + v.montantTotal, 0),
       dateCreation: c.createdAt,
     }));
 
@@ -104,6 +105,7 @@ export class ClientsService {
       telephone: c.telephone,
       adresse: c.adresse,
       nombreCommandes: c.ventes.length,
+      totalDepense: c.ventes.reduce((sum, v) => sum + v.montantTotal, 0),
       dateCreation: c.createdAt,
     }));
 

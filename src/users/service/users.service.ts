@@ -27,7 +27,11 @@ export class UsersService {
         motDePasse: hashed,
         role: role as any,
         magasinId: data.magasinId,
+        preference: {
+          create: {} // Crée des préférences par défaut
+        }
       },
+      include: { preference: true }
     });
   }
 
@@ -49,7 +53,7 @@ export class UsersService {
     if (!userToUpdate) throw new NotFoundException('Utilisateur non trouvé');
 
     // Restrictions de sécurité
-    if (currentUser.role !== 'SUPERADMIN') {
+    if (currentUser.role !== 'SUPERADMIN' && currentUser.id !== id) {
       if (userToUpdate.magasinId !== currentUser.magasinId) {
         throw new ForbiddenException('Vous ne pouvez modifier que les utilisateurs de votre magasin');
       }
@@ -70,6 +74,40 @@ export class UsersService {
     });
   }
 
+  async getProfile(userId: string) {
+    const user = await this.prisma.utilisateur.findUnique({
+      where: { idUtilisateur: userId },
+      include: { preference: true, magasin: true },
+    });
+    if (!user) throw new NotFoundException('Utilisateur non trouvé');
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { motDePasse, ...rest } = user;
+    return rest;
+  }
+
+  async updatePreferences(userId: string, data: any) {
+    return this.prisma.userPreference.upsert({
+      where: { utilisateurId: userId },
+      update: data,
+      create: { ...data, utilisateurId: userId },
+    });
+  }
+
+  async changePassword(userId: string, activeUser: any, data: { ancienMotDePasse: string; nouveauMotDePasse: string }) {
+    const user = await this.prisma.utilisateur.findUnique({ where: { idUtilisateur: userId } });
+    if (!user) throw new NotFoundException('Utilisateur non trouvé');
+
+    // Seul l'utilisateur lui-même peut changer son mot de passe (ou un SUPERADMIN si on voulait, mais ici on impose l'ancien mot de passe)
+    const isMatch = await bcrypt.compare(data.ancienMotDePasse, user.motDePasse);
+    if (!isMatch) throw new ForbiddenException('Ancien mot de passe incorrect');
+
+    const hashed = await bcrypt.hash(data.nouveauMotDePasse, 10);
+    return this.prisma.utilisateur.update({
+      where: { idUtilisateur: userId },
+      data: { motDePasse: hashed },
+    });
+  }
+
   async deleteUser(id: string, currentUser: any) {
     const userToDelete = await this.findById(id);
     if (!userToDelete) throw new NotFoundException('Utilisateur non trouvé');
@@ -85,6 +123,28 @@ export class UsersService {
 
     return this.prisma.utilisateur.delete({
       where: { idUtilisateur: id },
+    });
+  }
+
+  // ===== SESSIONS =====
+
+  async getSessions(userId: string) {
+    return this.prisma.userSession.findMany({
+      where: { utilisateurId: userId },
+      orderBy: { createdAt: 'desc' },
+      take: 5, // Limiter aux 5 dernières sessions
+    });
+  }
+
+  async revokeSession(userId: string, sessionId: string) {
+    const session = await this.prisma.userSession.findUnique({
+      where: { id: sessionId }
+    });
+    if (!session || session.utilisateurId !== userId) {
+      throw new ForbiddenException('Action non autorisée');
+    }
+    return this.prisma.userSession.delete({
+      where: { id: sessionId }
     });
   }
 }

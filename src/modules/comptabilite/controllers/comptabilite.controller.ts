@@ -65,6 +65,14 @@ export class ComptabiliteController {
     return this.comptabiliteService.getDistributionByCategory();
   }
 
+  @Get('financial-stats')
+  @Public()
+  @ApiOperation({ summary: 'Statistiques financières pour les rapports (Rentabilité, Trésorerie, Prévisions)' })
+  @ApiResponse({ status: 200, description: 'Stats financières calculées' })
+  async getFinancialStats() {
+    return this.comptabiliteService.getFinancialStats();
+  }
+
   // ===== RAPPORTS =====
 
   @Get('rapports')
@@ -131,7 +139,7 @@ export class ComptabiliteController {
     return this.comptabiliteService.verifyEquilibration();
   }
 
-  @Get('audit/trends')
+  @Get('audit/trend')
   @Public()
   @ApiOperation({ summary: 'Analyser les tendances financières' })
   @ApiResponse({ status: 200, type: AuditTrendDto })

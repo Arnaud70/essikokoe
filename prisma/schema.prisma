@@ -74,14 +74,47 @@ model Magasin {
 model Utilisateur {
   idUtilisateur String   @id @default(uuid())
   nom           String
+  prenom        String?
   email         String   @unique
   role          Role
   motDePasse    String
+  telephone     String?
+  photoUrl      String?
   magasinId     String?
   magasin       Magasin? @relation(fields: [magasinId], references: [idMagasin])
   createdAt     DateTime @default(now())
 
+  preference UserPreference?
+  sessions   UserSession[]
+
   @@map("utilisateurs")
+}
+
+model UserSession {
+  id            String      @id @default(uuid())
+  utilisateurId String
+  utilisateur   Utilisateur @relation(fields: [utilisateurId], references: [idUtilisateur], onDelete: Cascade)
+  userAgent     String?
+  ipAddress     String?
+  location      String?
+  current       Boolean     @default(false) // Pour identifier la session actuelle dans le frontend
+  lastActive    DateTime    @default(now())
+  createdAt     DateTime    @default(now())
+
+  @@map("user_sessions")
+}
+
+model UserPreference {
+  id                String      @id @default(uuid())
+  langue            String      @default("fr")
+  theme             String      @default("light")
+  emailNotifications Boolean     @default(true)
+  stockAlerts       Boolean     @default(true)
+  rapportQuotidien  Boolean     @default(false)
+  utilisateurId     String      @unique
+  utilisateur       Utilisateur @relation(fields: [utilisateurId], references: [idUtilisateur], onDelete: Cascade)
+
+  @@map("user_preferences")
 }
 
 model Client {

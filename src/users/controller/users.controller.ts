@@ -10,7 +10,12 @@ import {
   Request,
   HttpCode,
   HttpStatus,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
 import { UsersService } from '../service/users.service';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { UpdateUserDto } from '../dto/update-user.dto';
@@ -43,6 +48,54 @@ export class UsersController {
     return rest;
   }
 
+  // ===== PROFILE & PREFERENCES =====
+
+  @Get('profile')
+  @ApiOperation({ summary: 'Récupérer le profil de l\'utilisateur connecté' })
+  async getProfile(@Request() req: any) {
+    return this.usersService.getProfile(req.user.sub);
+  }
+
+  @Patch('profile')
+  @ApiOperation({ summary: 'Mettre à jour son propre profil' })
+  async updateProfile(@Request() req: any, @Body() dto: any) {
+    // On ne permet pas de changer son rôle via cet endpoint
+    const { role, magasinId, email, ...rest } = dto;
+    return this.usersService.updateUser(req.user.sub, rest, req.user);
+  }
+
+  @Patch('preferences')
+  @ApiOperation({ summary: 'Mettre à jour ses préférences' })
+  async updatePreferences(@Request() req: any, @Body() dto: any) {
+    return this.usersService.updatePreferences(req.user.sub, dto);
+  }
+
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Changer son mot de passe' })
+  async changePassword(@Request() req: any, @Body() dto: any) {
+    return this.usersService.changePassword(req.user.sub, req.user, dto);
+  }
+
+  @Post('upload-photo')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: './uploads',
+        filename: (req, file, cb) => {
+          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+          cb(null, `${uniqueSuffix}${extname(file.originalname)}`);
+        },
+      }),
+    }),
+  )
+  @ApiOperation({ summary: 'Uploader une photo de profil' })
+  async uploadPhoto(@Request() req: any, @UploadedFile() file: any) {
+    const photoUrl = `${req.protocol}://${req.get('host')}/uploads/${file.filename}`;
+    await this.usersService.updateUser(req.user.sub, { photoUrl }, req.user);
+    return { photoUrl };
+  }
+
   @Roles('SUPERADMIN', 'GERANT')
   @Get()
   @ApiOperation({ summary: 'Lister les utilisateurs' })
@@ -54,6 +107,18 @@ export class UsersController {
       const { motDePasse, ...rest } = u as any;
       return rest;
     });
+  }
+
+  @Get('sessions')
+  @ApiOperation({ summary: 'Lister ses sessions actives' })
+  async getSessions(@Request() req: any) {
+    return this.usersService.getSessions(req.user.sub);
+  }
+
+  @Delete('sessions/:id')
+  @ApiOperation({ summary: 'Révoquer (déconnecter) une session' })
+  async revokeSession(@Request() req: any, @Param('id') id: string) {
+    return this.usersService.revokeSession(req.user.sub, id);
   }
 
   @Roles('SUPERADMIN', 'GERANT')

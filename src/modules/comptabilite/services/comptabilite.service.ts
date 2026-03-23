@@ -318,6 +318,49 @@ export class ComptabiliteService {
     };
   }
 
+  async getFinancialStats() {
+    const transactions = await this.prisma.transaction.findMany();
+    
+    let totalRecettes = 0;
+    let totalDepenses = 0;
+    
+    transactions.forEach(t => {
+      if (t.typeTransaction === 'RECETTE') totalRecettes += t.montant;
+      else totalDepenses += t.montant;
+    });
+
+    const beneficeNet = totalRecettes - totalDepenses;
+    const margeNette = totalRecettes > 0 ? (beneficeNet / totalRecettes) * 100 : 0;
+
+    // Trésorerie
+    const tresorerieData = [
+      { label: 'Total Encaissements', value: totalRecettes.toLocaleString() + ' FCFA', color: 'text-green-600' },
+      { label: 'Total Décaissements', value: totalDepenses.toLocaleString() + ' FCFA', color: 'text-red-600' },
+      { label: 'Solde Net', value: beneficeNet.toLocaleString() + ' FCFA', color: beneficeNet >= 0 ? 'text-green-600' : 'text-red-600' },
+    ];
+
+    // Rentabilité
+    const rentabiliteData = [
+      { label: 'Chiffre d\'Affaires', value: totalRecettes.toLocaleString() + ' FCFA' },
+      { label: 'Bénéfice Net', value: beneficeNet.toLocaleString() + ' FCFA' },
+      { label: 'Marge bénéficiaire', value: margeNette.toFixed(2) + ' %' },
+    ];
+
+    // Prévisions
+    const trends = await this.analyzeTrends();
+    const previsions = [
+      { title: 'Revenu estimé (30j)', value: Math.round(totalRecettes * (1 + (trends.tauxCroissance / 100))).toLocaleString() + ' FCFA', color: 'text-orange-600', trend: trends.tendance },
+      { title: 'Croissance attendue', value: trends.tauxCroissance + ' %', color: 'text-blue-600', trend: 'Basé sur historique' },
+      { title: 'Point Mort', value: totalDepenses.toLocaleString() + ' FCFA', color: 'text-gray-600', trend: 'Seuil rentabilité' },
+    ];
+
+    return {
+      rentabilite: rentabiliteData,
+      tresorerie: tresorerieData,
+      previsions: previsions
+    };
+  }
+
   private generateRecommandations(auditStatus: any, equilibration: any, trends: any): string[] {
     const recommandations: string[] = [];
     if (!equilibration.equilibre) recommandations.push('Vérifier le déséquilibre du bilan détecté');
