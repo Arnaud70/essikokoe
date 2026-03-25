@@ -28,25 +28,44 @@ export class AuthService {
 
   async login(user: any, metadata?: { userAgent?: string; ip?: string }) {
     if (!user) throw new UnauthorizedException();
-    const payload = { sub: user.idUtilisateur, email: user.email, role: user.role, magasinId: user.magasinId };
-    const accessToken = this.jwtService.sign(payload, { expiresIn: '1d' });
-    const refreshPayload = { ...payload, type: 'refresh' };
-    const refreshToken = this.jwtService.sign(refreshPayload, { expiresIn: '7d' });
-
-    // Créer une session dans la DB
+    // 1. Désactiver toutes les autres sessions actives de l'utilisateur
     if (metadata) {
-      await this.prisma.userSession.create({
+      await this.prisma.userSession.updateMany({
+        where: { utilisateurId: user.idUtilisateur, current: true },
+        data: { current: false },
+      });
+
+      // 2. Créer la nouvelle session
+      const session = await this.prisma.userSession.create({
         data: {
           utilisateurId: user.idUtilisateur,
           userAgent: metadata.userAgent,
           ipAddress: metadata.ip,
           location: 'Lomé, Togo', // Simulation de localisation pour l'instant
-          current: true, // On marquera les autres comme false plus tard ou on gérera côté front
+          current: true,
         }
       });
+
+      // 3. Ajouter l'ID de session au payload
+      const payload = { 
+        sub: user.idUtilisateur, 
+        email: user.email, 
+        role: user.role, 
+        magasinId: user.magasinId,
+        sessionId: session.id 
+      };
+      
+      const accessToken = this.jwtService.sign(payload, { expiresIn: '1d' });
+      const refreshPayload = { ...payload, type: 'refresh' };
+      const refreshToken = this.jwtService.sign(refreshPayload, { expiresIn: '7d' });
+
+      return { accessToken, refreshToken };
     }
 
-    return { accessToken, refreshToken };
+    // Fallback si pas de metadata (peu probable avec votre controller actuel)
+    const payload = { sub: user.idUtilisateur, email: user.email, role: user.role, magasinId: user.magasinId };
+    const accessToken = this.jwtService.sign(payload, { expiresIn: '1d' });
+    return { accessToken };
   }
 
   async refresh(tokenPayload: any) {

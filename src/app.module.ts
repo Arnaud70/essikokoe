@@ -10,9 +10,10 @@ import { FacturesModule } from './modules/factures/factures.module';
 import { ComptabiliteModule } from './modules/comptabilite/comptabilite.module';
 import { RapportsModule } from './modules/rapports/rapports.module';
 import { MagasinsModule } from './modules/magasins/magasins.module';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
+import { SessionUpdateInterceptor } from './auth/interceptors/session-update.interceptor';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_INTERCEPTOR, useClass: SessionUpdateInterceptor },
   ],
 })
 export class AppModule { }
