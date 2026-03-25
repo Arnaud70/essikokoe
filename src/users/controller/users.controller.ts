@@ -14,8 +14,7 @@ import {
   UploadedFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { CloudinaryService } from '../../common/cloudinary/cloudinary.service';
 import { UsersService } from '../service/users.service';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { UpdateUserDto } from '../dto/update-user.dto';
@@ -29,6 +28,8 @@ import { UserResponseDto } from '../dto/user.response.dto';
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 export class UsersController {
+  private cloudinaryService = new CloudinaryService();
+
   constructor(private usersService: UsersService) { }
 
   @Roles('SUPERADMIN', 'GERANT')
@@ -80,18 +81,12 @@ export class UsersController {
   @Post('upload-photo')
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: './uploads',
-        filename: (req, file, cb) => {
-          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-          cb(null, `${uniqueSuffix}${extname(file.originalname)}`);
-        },
-      }),
+      storage: new CloudinaryService().getStorage(),
     }),
   )
   @ApiOperation({ summary: 'Uploader une photo de profil' })
   async uploadPhoto(@Request() req: any, @UploadedFile() file: any) {
-    const photoUrl = `${req.protocol}://${req.get('host')}/uploads/${file.filename}`;
+    const photoUrl = file.path; // Cloudinary returns the full URL in file.path
     await this.usersService.updateUser(req.user.sub, { photoUrl }, req.user);
     return { photoUrl };
   }
