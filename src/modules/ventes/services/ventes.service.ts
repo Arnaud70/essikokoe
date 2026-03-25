@@ -124,6 +124,9 @@ export class VentesService {
         });
 
         return vente.idVente;
+      }, {
+        maxWait: 5000, 
+        timeout: 20000 
       });
 
       return {
@@ -350,6 +353,9 @@ export class VentesService {
       await tx.transaction.deleteMany({ where: { venteId: idVente } });
       await tx.ligneVente.deleteMany({ where: { venteId: idVente } });
       await tx.vente.delete({ where: { idVente } });
+    }, {
+      maxWait: 5000,
+      timeout: 20000
     });
 
     return { message: 'Vente annulée et supprimée avec succès' };
