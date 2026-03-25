@@ -261,8 +261,40 @@ export class ProduitsService {
   }
 
   async deleteProduit(codeProduit: string): Promise<{ message: string }> {
-    await (this.prisma as any).produit.delete({ where: { codeProduit } });
-    return { message: 'Produit supprimé avec succès' };
+    try {
+      // Vérifier si le produit est lié à des factures/ventes
+      const ventesCount = await (this.prisma as any).ligneVente.count({
+        where: { produitId: codeProduit },
+      });
+
+      if (ventesCount > 0) {
+        throw new BadRequestException('Impossible de supprimer ce produit car il est lié à des factures existantes.');
+      }
+
+      // Vérifier si le produit est lié à des mouvements de stock autres que sa création initiale
+      const movementsCount = await (this.prisma as any).stockMovement.count({
+        where: { codeProduit },
+      });
+
+      if (movementsCount > 0) {
+        throw new BadRequestException('Impossible de supprimer ce produit car il possède un historique de mouvements de stock.');
+      }
+
+      // S'il ne viole aucune règle majeure, on peut supprimer ses stocks associés (comme la valeur initiale à 0)
+      await (this.prisma as any).stock.deleteMany({
+        where: { produitId: codeProduit },
+      });
+
+      // Et enfin, supprimer le produit
+      await (this.prisma as any).produit.delete({ where: { codeProduit } });
+
+      return { message: 'Produit supprimé avec succès' };
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new BadRequestException('Erreur liée à la base de données: ce produit est utilisé ailleurs.');
+    }
   }
 
   async getProduitsDashboardMetrics(user: any, requestedMagasinId?: string): Promise<any> {
